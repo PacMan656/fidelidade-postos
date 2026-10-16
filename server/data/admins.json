@@ -1,0 +1,8 @@
+{
+  "_comment": "Tokens de acesso ao painel. tenants: [\"*\"] = todas as redes. TROQUE os tokens antes de publicar.",
+  "admins": [
+    { "name": "Administrador da plataforma", "token": "admin-plataforma-troque", "tenants": ["*"] },
+    { "name": "Gestor Dona Rosa", "token": "dona-rosa-troque", "tenants": ["dona-rosa"] },
+    { "name": "Gestor Rede Avenida", "token": "avenida-troque", "tenants": ["rede-avenida"] }
+  ]
+}

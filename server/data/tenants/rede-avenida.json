@@ -1,0 +1,262 @@
+{
+  "id": "rede-avenida",
+  "version": 1,
+  "updatedAt": "2026-10-16T12:00:00.000Z",
+  "domains": [
+    "avenida.localhost"
+  ],
+  "brand": {
+    "name": "Rede Avenida",
+    "eyebrow": "POSTOS",
+    "wordmark": "AVENIDA",
+    "logoText": "AV",
+    "colors": {
+      "brand": "#0E5FD8",
+      "brandDeep": "#0A45A0",
+      "wordmark": "#0A2F6B",
+      "ink": "#0B1A33",
+      "inkSoft": "#14294D",
+      "accent": "#FF9F1C",
+      "cream": "#F3F6FB"
+    }
+  },
+  "texts": {
+    "homeSubtitle": "Bora rodar e juntar pontos?",
+    "walletName": "Carteira Avenida",
+    "servicesTitle": "Serviços Avenida",
+    "welcome": [
+      {
+        "icon": "Fuel",
+        "title": "Abasteça e pontue",
+        "body": "Cada real em combustível ou na conveniência vira ponto na sua conta."
+      },
+      {
+        "icon": "Wallet",
+        "title": "Pague pelo app",
+        "body": "Carteira pré-paga com Pix ou cartão e pontos em dobro."
+      },
+      {
+        "icon": "Gift",
+        "title": "Troque por vantagens",
+        "body": "Troca de óleo, lavagem, café e cupons nos parceiros da cidade."
+      }
+    ]
+  },
+  "stations": [
+    "Av. Brasil",
+    "Marginal"
+  ],
+  "features": {
+    "wallet": true,
+    "pix": true,
+    "priceLock": false,
+    "maintenance": true,
+    "club": true,
+    "missions": true,
+    "frentista": true
+  },
+  "points": {
+    "perReal": 1,
+    "appMultiplier": 2,
+    "expiringNotice": "180 pontos expiram em 12 dias"
+  },
+  "levels": [
+    {
+      "name": "Start",
+      "min": 0
+    },
+    {
+      "name": "Plus",
+      "min": 2000
+    },
+    {
+      "name": "Premium",
+      "min": 5000
+    }
+  ],
+  "fuelPrices": {
+    "Gasolina": 6.19,
+    "Gasolina Aditivada": 6.49,
+    "Etanol": 4.39
+  },
+  "priceLock": {
+    "validityDays": 30,
+    "presets": [
+      20,
+      30,
+      50
+    ]
+  },
+  "offer": {
+    "active": true,
+    "label": "OFERTA DE HOJE",
+    "value": "R$ 0,15",
+    "unit": "por litro",
+    "description": "Etanol e gasolina · todas as unidades",
+    "until": "até 20h",
+    "qrBadge": "Desconto ativo: −R$ 0,15 / litro"
+  },
+  "pix": {
+    "key": "98.765.432/0001-10",
+    "keyLabel": "Chave Pix da rede (CNPJ)",
+    "payload": "00020126360014BR.GOV.BCB.PIX0114987654320001105204000053039865802BR5912REDE AVENIDA6009SAO PAULO62070503***6304B2C3"
+  },
+  "rewards": [
+    {
+      "id": "lavagem",
+      "name": "Lavagem completa",
+      "cat": "Serviço",
+      "cost": 1500,
+      "icon": "Droplets",
+      "hue": "#2C82C9",
+      "desc": "Lavagem externa, aspiração interna, pretinho nos pneus e secagem.",
+      "active": true
+    },
+    {
+      "id": "checkup",
+      "name": "Calibragem + check-up",
+      "cat": "Serviço auto",
+      "cost": 600,
+      "icon": "Gauge",
+      "hue": "#8A5BD6",
+      "desc": "Calibragem dos 4 pneus e estepe, verificação de fluidos, palhetas e luzes.",
+      "active": true
+    },
+    {
+      "id": "cafe",
+      "name": "Café + snack",
+      "cat": "Conveniência",
+      "cost": 400,
+      "icon": "Coffee",
+      "hue": "#C0703B",
+      "desc": "Um café expresso médio e um salgado ou snack à sua escolha na conveniência.",
+      "active": true
+    },
+    {
+      "id": "vale10",
+      "name": "Vale R$ 10 na loja",
+      "cat": "Conveniência",
+      "cost": 1000,
+      "icon": "ShoppingBag",
+      "hue": "#D45B86",
+      "desc": "Crédito de R$ 10 para usar em qualquer produto da loja de conveniência.",
+      "active": true
+    },
+    {
+      "id": "ducha",
+      "name": "Ducha rápida",
+      "cat": "Serviço",
+      "cost": 500,
+      "icon": "Droplets",
+      "hue": "#0E5FD8",
+      "desc": "Ducha externa com secagem, em qualquer unidade.",
+      "active": true
+    }
+  ],
+  "partners": [
+    {
+      "id": "farmacia",
+      "name": "Farmácia Saúde+",
+      "offer": "15% de desconto",
+      "icon": "Plus",
+      "hue": "#2C82C9",
+      "address": "Rua das Flores, 120 · Centro",
+      "rules": "Válido em medicamentos e perfumaria. Não cumulativo com outras promoções.",
+      "active": true
+    },
+    {
+      "id": "restaurante",
+      "name": "Restaurante Sabor da Praça",
+      "offer": "Sobremesa grátis",
+      "icon": "Utensils",
+      "hue": "#C0703B",
+      "address": "Praça da Matriz, 45",
+      "rules": "Na compra de um prato executivo. De segunda a sexta, no almoço.",
+      "active": true
+    }
+  ],
+  "missions": [
+    {
+      "id": "abastece3",
+      "title": "Abasteça 3× nesta semana",
+      "reward": "+300 pts",
+      "progress": 66,
+      "icon": "Fuel",
+      "active": true
+    },
+    {
+      "id": "carteira",
+      "title": "Pague pela Carteira Avenida",
+      "reward": "Pontos 2×",
+      "progress": 0,
+      "icon": "Wallet",
+      "active": true
+    },
+    {
+      "id": "lavagem",
+      "title": "Experimente a lavagem",
+      "reward": "Cupom 30% off",
+      "progress": 0,
+      "icon": "Droplets",
+      "active": true
+    }
+  ],
+  "campaign": {
+    "name": "CAMPANHA DE OUTUBRO",
+    "period": "01–31 out",
+    "prize": 300,
+    "prizeLabel": "R$ 300",
+    "identPct": 64,
+    "identGoal": 70,
+    "items": [
+      {
+        "key": "cadastros",
+        "label": "Clientes cadastrados",
+        "action": "+1 cadastro",
+        "icon": "UserPlus",
+        "goal": 20,
+        "reward": 5
+      },
+      {
+        "key": "trocas",
+        "label": "Trocas de óleo",
+        "action": "+1 troca de óleo",
+        "icon": "Wrench",
+        "goal": 10,
+        "reward": 8
+      },
+      {
+        "key": "aditivos",
+        "label": "Aditivos vendidos",
+        "action": "+1 aditivo",
+        "icon": "Fuel",
+        "goal": 15,
+        "reward": 3
+      },
+      {
+        "key": "lavagens",
+        "label": "Lavagens",
+        "action": "+1 lavagem",
+        "icon": "Droplets",
+        "goal": 8,
+        "reward": 4
+      }
+    ],
+    "challenges": [
+      {
+        "title": "Cadastre 5 clientes hoje",
+        "reward": "+ R$ 15 extra",
+        "icon": "UserPlus"
+      },
+      {
+        "title": "Bata 70% de identificação",
+        "reward": "Bônus em dobro",
+        "icon": "Target"
+      }
+    ]
+  },
+  "support": {
+    "phone": "(11) 3000-9876",
+    "email": "atendimento@redeavenida.com.br"
+  }
+}

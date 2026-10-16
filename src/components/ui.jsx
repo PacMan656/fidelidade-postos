@@ -3,17 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Check, AlertCircle, Crown } from "lucide-react";
 import { c, num } from "../theme";
 import { useApp } from "../store/AppStore";
+import { useConfig } from "../config/ConfigProvider";
 
 export function Logo({ size = "md" }) {
   const big = size === "lg";
+  const { brand } = useConfig().config;
   return (
     <div className="row" style={{ gap: 10 }}>
       <div className="row center" style={{ width: big ? 64 : 46, height: big ? 54 : 38, borderRadius: big ? 14 : 10, background: c.brand, boxShadow: `inset 0 -3px 0 ${c.brandDeep}` }}>
-        <span style={{ fontSize: big ? 24 : 17, fontWeight: 900, color: "#fff", letterSpacing: 0.5, fontStyle: "italic" }}>PDR</span>
+        <span style={{ fontSize: big ? 24 : 17, fontWeight: 900, color: "#fff", letterSpacing: 0.5, fontStyle: "italic" }}>{brand.logoText}</span>
       </div>
       <div style={{ lineHeight: 1.0 }}>
-        <div style={{ fontSize: big ? 10 : 7.5, letterSpacing: 1.5, color: c.muted, fontWeight: 800 }}>REDE DE POSTOS</div>
-        <div style={{ fontSize: big ? 26 : 17, fontWeight: 900, color: c.wordmark, letterSpacing: -0.3 }}>DONA ROSA</div>
+        <div style={{ fontSize: big ? 10 : 7.5, letterSpacing: 1.5, color: c.muted, fontWeight: 800 }}>{brand.eyebrow}</div>
+        <div style={{ fontSize: big ? 26 : 17, fontWeight: 900, color: c.wordmark, letterSpacing: -0.3 }}>{brand.wordmark}</div>
       </div>
     </div>
   );
@@ -103,19 +105,19 @@ export function PointsMeter({ onClick }) {
           <Crown size={14} color={c.yellow} />
           <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: c.yellow }}>NÍVEL {level.name.toUpperCase()}</span>
         </div>
-        <span style={{ fontSize: 11, color: "#caa6ad" }}>{level.next ? `${num(level.faltam)} pts p/ ${level.next}` : "Nível máximo"}</span>
+        <span style={{ fontSize: 11, color: c.onInk1 }}>{level.next ? `${num(level.faltam)} pts p/ ${level.next}` : "Nível máximo"}</span>
       </div>
       <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 10, letterSpacing: 2, color: "#b08c92", fontWeight: 700 }}>SALDO DE PONTOS</div>
+        <div style={{ fontSize: 10, letterSpacing: 2, color: c.onInk2, fontWeight: 700 }}>SALDO DE PONTOS</div>
         <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
           <span className="mono" style={{ fontSize: 46, fontWeight: 700, color: c.yellow, letterSpacing: 2, textShadow: `0 0 18px ${c.yellow}55` }}>{num(s.points)}</span>
-          <span style={{ fontSize: 13, color: "#caa6ad", marginBottom: 10 }}>pts</span>
+          <span style={{ fontSize: 13, color: c.onInk1, marginBottom: 10 }}>pts</span>
         </div>
       </div>
       <div style={{ marginTop: 6 }}>
         <div className="bar"><div style={{ width: `${level.fill}%` }} /></div>
-        <div className="row between" style={{ marginTop: 6, fontSize: 10, color: "#b08c92" }}>
-          <span>{onClick ? "Toque para ver o extrato" : "Bronze · Prata · Ouro · Diamante"}</span>
+        <div className="row between" style={{ marginTop: 6, fontSize: 10, color: c.onInk2 }}>
+          <span>{onClick ? "Toque para ver o extrato" : level.all.join(" · ")}</span>
           <span>{level.next || level.name}</span>
         </div>
       </div>

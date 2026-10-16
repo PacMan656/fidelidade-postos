@@ -1,16 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { initialState, fuelPrices, LEVELS } from "./data";
+import { makeInitialState } from "./data";
+import { useConfig } from "../config/ConfigProvider";
 import { brl, num } from "../theme";
 
-const KEY = "dona-rosa-state-v1";
 const Ctx = createContext(null);
 
-function load() {
+// o estado do usuário é separado por rede
+function load(key, initial) {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return { ...initialState, ...JSON.parse(raw) };
+    const raw = localStorage.getItem(key);
+    if (raw) return { ...initial, ...JSON.parse(raw) };
   } catch (e) {}
-  return initialState;
+  return initial;
 }
 
 const nowLabel = () => {
@@ -19,14 +20,18 @@ const nowLabel = () => {
 };
 const code = (p) => `${p}-` + Math.random().toString(36).slice(2, 6).toUpperCase();
 
-export function AppProvider({ children }) {
-  const [s, setS] = useState(load);
+export function AppProvider({ children, preview = false }) {
+  const { config, tenantId } = useConfig();
+  const KEY = `app-state-${tenantId}`;
+  // na pré-visualização do painel: entra direto como cliente e não grava nada
+  const [s, setS] = useState(() => (preview ? { ...makeInitialState(config), session: { role: "cliente" } } : load(KEY, makeInitialState(config))));
   const [toast, setToast] = useState(null);
   const timer = useRef();
 
   useEffect(() => {
+    if (preview) return;
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
-  }, [s]);
+  }, [s, KEY, preview]);
 
   const flash = useCallback((m, tone = "ok") => {
     clearTimeout(timer.current);
@@ -39,7 +44,7 @@ export function AppProvider({ children }) {
   const actions = useMemo(() => ({
     login: (role) => patch(() => ({ session: { role } })),
     logout: () => patch(() => ({ session: null })),
-    reset: () => { setS({ ...initialState, session: s.session }); flash("Dados de demonstração restaurados"); },
+    reset: () => { setS({ ...makeInitialState(config), session: s.session }); flash("Dados de demonstração restaurados"); },
 
     activateOffer: () => patch((p) => (p.offerActive ? {} : { offerActive: true })),
 
@@ -80,11 +85,12 @@ export function AppProvider({ children }) {
       const a = Number(amount) || 0;
       if (a <= 0) { flash("Informe o valor do abastecimento", "err"); return null; }
       if (method === "prepaid" && s.prepaid < a) { flash("Saldo pré-pago insuficiente", "err"); return null; }
-      const pts = Math.round(a) * 2; // pontos em dobro pagando pelo app
+      const mult = config.points?.appMultiplier || 1;
+      const pts = Math.round(a * (config.points?.perReal || 1) * mult);
       patch((p) => ({
         prepaid: method === "prepaid" ? p.prepaid - a : p.prepaid,
         points: p.points + pts,
-        tx: [{ t: "Pagamento pelo app · pontos 2×", d: "Agora", v: pts, kind: "in" }, ...p.tx],
+        tx: [{ t: `Pagamento pelo app${mult > 1 ? ` · pontos ${mult}×` : ""}`, d: "Agora", v: pts, kind: "in" }, ...p.tx],
       }));
       return { amount: a, pts, auth: code("AUT") };
     },
@@ -92,7 +98,7 @@ export function AppProvider({ children }) {
     lockPrice: (fuel, liters) => {
       const l = Number(liters) || 0;
       if (l <= 0) { flash("Escolha quantos litros travar", "err"); return false; }
-      const price = fuelPrices[fuel];
+      const price = config.fuelPrices[fuel];
       patch((p) => ({ banked: [{ fuel, liters: l, price, date: "Agora" }, ...p.banked] }));
       flash(`${l} L de ${fuel} travados a ${brl(price)}/L`);
       return true;
@@ -114,17 +120,18 @@ export function AppProvider({ children }) {
 
     updateCar: (car) => { patch((p) => ({ car: { ...p.car, ...car } })); flash("Veículo atualizado"); },
 
-    bumpFr: (k, msg) => { patch((p) => ({ fr: { ...p.fr, [k]: p.fr[k] + 1 } })); flash(msg); },
-  }), [s, flash]);
+    bumpFr: (k, msg) => { patch((p) => ({ fr: { ...p.fr, [k]: (p.fr[k] || 0) + 1 } })); flash(msg); },
+  }), [s, flash, config]);
 
   const level = useMemo(() => {
     let i = 0;
-    LEVELS.forEach((l, idx) => { if (s.points >= l.min) i = idx; });
-    const cur = LEVELS[i], next = LEVELS[i + 1];
+    const levels = [...config.levels].sort((a, b) => a.min - b.min);
+    levels.forEach((l, idx) => { if (s.points >= l.min) i = idx; });
+    const cur = levels[i], next = levels[i + 1];
     const faltam = next ? next.min - s.points : 0;
     const fill = next ? Math.round(((s.points - cur.min) / (next.min - cur.min)) * 100) : 100;
-    return { name: cur.name, next: next?.name, faltam, fill };
-  }, [s.points]);
+    return { name: cur.name, next: next?.name, faltam, fill, all: levels.map((l) => l.name) };
+  }, [s.points, config.levels]);
 
   const value = useMemo(() => ({ s, level, toast, flash, ...actions }), [s, level, toast, flash, actions]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

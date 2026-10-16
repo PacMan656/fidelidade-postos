@@ -4,12 +4,16 @@ import { Lock, TrendingUp, Fuel, Car, Check, CalendarClock, Wrench, Bell, Zap, A
 import { c, brl, num } from "../../theme";
 import { Screen, Empty } from "../../components/ui";
 import { useApp } from "../../store/AppStore";
-import { fuelPrices, maintIcons } from "../../store/data";
+import { maintIcons } from "../../store/data";
+import { useConfig } from "../../config/ConfigProvider";
 
 /* ---------- Trava de preço ---------- */
 export function TravaPreco() {
   const { s, lockPrice } = useApp();
-  const [fuel, setFuel] = useState("Gasolina");
+  const { config } = useConfig();
+  const fuelPrices = config.fuelPrices;
+  const presets = config.priceLock?.presets || [20, 30, 50];
+  const [fuel, setFuel] = useState(Object.keys(fuelPrices)[0]);
   const [liters, setLiters] = useState(30);
   const total = (Number(liters) || 0) * fuelPrices[fuel];
   const totalBanked = s.banked.reduce((a, b) => a + b.liters, 0);
@@ -21,9 +25,9 @@ export function TravaPreco() {
           <div className="row" style={{ gap: 6 }}><Lock size={14} color={c.yellow} /><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: c.yellow }}>MEU BANCO DE LITROS</span></div>
           <div className="row" style={{ gap: 6, alignItems: "flex-end", marginTop: 8 }}>
             <span className="mono" style={{ fontSize: 40, fontWeight: 700, color: c.yellow }}>{num(totalBanked)}</span>
-            <span style={{ fontSize: 14, color: "#caa6ad", marginBottom: 8 }}>litros travados</span>
+            <span style={{ fontSize: 14, color: c.onInk1, marginBottom: 8 }}>litros travados</span>
           </div>
-          <div style={{ fontSize: 12, color: "#dcc3c8" }}>Compre litros ao preço de hoje e abasteça quando quiser.</div>
+          <div style={{ fontSize: 12, color: c.onInk0 }}>Compre litros ao preço de hoje e abasteça quando quiser.</div>
         </div>
 
         <div className="field-label mt20">Combustível</div>
@@ -37,10 +41,10 @@ export function TravaPreco() {
         </div>
 
         <div className="row" style={{ gap: 5, marginTop: 14, marginBottom: 6, fontSize: 11.5, color: c.muted }}>
-          <TrendingUp size={13} /> Trava válida por 30 dias · protege da alta
+          <TrendingUp size={13} /> Trava válida por {config.priceLock?.validityDays || 30} dias · protege da alta
         </div>
         <div className="grid3">
-          {[20, 30, 50].map((v) => <button key={v} className={`choice ${Number(liters) === v ? "on" : ""}`} onClick={() => setLiters(v)}>{v} L</button>)}
+          {presets.map((v) => <button key={v} className={`choice ${Number(liters) === v ? "on" : ""}`} onClick={() => setLiters(v)}>{v} L</button>)}
         </div>
         <div className="mt12">
           <label className="field-label" htmlFor="lit">Outra quantidade (litros)</label>
@@ -48,7 +52,7 @@ export function TravaPreco() {
         </div>
 
         <div className="row between mt12" style={{ padding: "12px 14px", borderRadius: 12, background: c.ink }}>
-          <div style={{ fontSize: 11, color: "#b08c92" }}>Total a travar<br />{Number(liters) || 0} L × {brl(fuelPrices[fuel])}</div>
+          <div style={{ fontSize: 11, color: c.onInk2 }}>Total a travar<br />{Number(liters) || 0} L × {brl(fuelPrices[fuel])}</div>
           <div className="mono" style={{ fontSize: 24, fontWeight: 700, color: c.yellow }}>{brl(total)}</div>
         </div>
         <button className="btn grad mt12" onClick={() => lockPrice(fuel, liters)}>Travar {Number(liters) || 0} L · {brl(total)}</button>
@@ -58,7 +62,7 @@ export function TravaPreco() {
             <div className="eyebrow">MEUS LITROS TRAVADOS</div>
             <div className="col" style={{ gap: 8 }}>
               {s.banked.map((b, i) => {
-                const saving = (fuelPrices[b.fuel] - b.price) * b.liters;
+                const saving = ((fuelPrices[b.fuel] ?? b.price) - b.price) * b.liters;
                 return (
                   <div key={i} className="card row" style={{ gap: 11, padding: 12 }}>
                     <div className="icon-box" style={{ width: 38, height: 38, borderRadius: 11, background: c.amberSoft }}><Fuel size={18} color={c.brandDeep} /></div>
@@ -97,10 +101,10 @@ export function Manutencao() {
           <div className="icon-box" style={{ width: 44, height: 44, background: "rgba(255,255,255,.1)" }}><Car size={22} color={c.yellow} /></div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 800 }}>{s.car.model}</div>
-            <div className="mono" style={{ fontSize: 12, color: "#caa6ad" }}>{s.car.plate} · ~{num(s.car.km)} km</div>
-            <div className="row" style={{ gap: 6, marginTop: 6, fontSize: 11.5, color: "#dcc3c8" }}><TrendingUp size={13} color={c.yellow} /> ~{num(s.car.kmMonth)} km/mês pelos seus abastecimentos</div>
+            <div className="mono" style={{ fontSize: 12, color: c.onInk1 }}>{s.car.plate} · ~{num(s.car.km)} km</div>
+            <div className="row" style={{ gap: 6, marginTop: 6, fontSize: 11.5, color: c.onInk0 }}><TrendingUp size={13} color={c.yellow} /> ~{num(s.car.kmMonth)} km/mês pelos seus abastecimentos</div>
           </div>
-          <Pencil size={16} color="#caa6ad" />
+          <Pencil size={16} color={c.onInk1} />
         </button>
 
         <div className="col mt16" style={{ gap: 10 }}>
@@ -149,11 +153,13 @@ export function Agendar() {
   const { id } = useParams();
   const nav = useNavigate();
   const { s, scheduleMaint } = useApp();
+  const { config } = useConfig();
+  const stations = config.stations?.length ? config.stations : ["Matriz"];
   const m = s.maint.find((x) => x.id === id);
   const days = nextDays();
   const [day, setDay] = useState(0);
   const [hour, setHour] = useState(null);
-  const [station, setStation] = useState("Centro");
+  const [station, setStation] = useState(stations[0]);
   if (!m) return <Screen title="Agendar"><Empty Icon={Wrench} title="Serviço não encontrado" text="Volte à manutenção." /></Screen>;
 
   const fmt = (d) => d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" }).replace(".", "");
@@ -173,7 +179,7 @@ export function Agendar() {
 
         <div className="field-label mt20">Posto</div>
         <div className="grid2" style={{ gap: 8 }}>
-          {["Centro", "Rodovia"].map((p) => <button key={p} className={`choice ${station === p ? "on" : ""}`} onClick={() => setStation(p)}>Posto {p}</button>)}
+          {stations.map((p) => <button key={p} className={`choice ${station === p ? "on" : ""}`} onClick={() => setStation(p)}>Posto {p}</button>)}
         </div>
 
         <div className="field-label mt16">Dia</div>
@@ -208,7 +214,7 @@ export function Notificacoes() {
           {s.notifications.map((n) => {
             const Icon = notifIcon[n.kind] || Bell;
             return (
-              <button key={n.id} className="card row" style={{ gap: 12, textAlign: "left", alignItems: "flex-start", background: n.read ? c.paper : "#FFFBF2" }}
+              <button key={n.id} className="card row" style={{ gap: 12, textAlign: "left", alignItems: "flex-start", background: n.read ? c.paper : c.amberSoft }}
                 onClick={() => { readOne(n.id); nav(notifTarget[n.kind] || "/inicio"); }}>
                 <div className="icon-box" style={{ width: 38, height: 38, borderRadius: 11, background: n.read ? c.cream : c.amberSoft }}><Icon size={18} color={c.brandDeep} /></div>
                 <div style={{ flex: 1 }}>
@@ -229,13 +235,15 @@ export function Notificacoes() {
 export function Perfil() {
   const nav = useNavigate();
   const { s, level, logout, reset } = useApp();
+  const { config } = useConfig();
+  const f = config.features || {};
   const items = [
-    { Icon: Car, t: "Meu veículo", sub: `${s.car.model} · ${s.car.plate}`, to: "/perfil/veiculo" },
+    f.maintenance !== false && { Icon: Car, t: "Meu veículo", sub: `${s.car.model} · ${s.car.plate}`, to: "/perfil/veiculo" },
     { Icon: Ticket, t: "Meus vouchers", sub: `${s.vouchers.length} ativo(s)`, to: "/vouchers" },
     { Icon: Receipt, t: "Extrato de pontos", sub: `${num(s.points)} pts`, to: "/extrato" },
-    { Icon: Lock, t: "Litros travados", sub: `${s.banked.reduce((a, b) => a + b.liters, 0)} L`, to: "/trava-de-preco" },
+    f.priceLock !== false && { Icon: Lock, t: "Litros travados", sub: `${s.banked.reduce((a, b) => a + b.liters, 0)} L`, to: "/trava-de-preco" },
     { Icon: Bell, t: "Notificações", sub: `${s.notifications.filter((n) => !n.read).length} não lida(s)`, to: "/notificacoes" },
-  ];
+  ].filter(Boolean);
   return (
     <Screen title="Meu perfil">
       <div className="px">
@@ -263,6 +271,11 @@ export function Perfil() {
           ))}
         </div>
 
+        {config.support && <div className="card col mt16" style={{ gap: 6, fontSize: 13 }}>
+          <div className="eyebrow" style={{ marginBottom: 2 }}>ATENDIMENTO {config.brand.name.toUpperCase()}</div>
+          <span style={{ userSelect: "all" }}>{config.support.phone}</span>
+          <span style={{ userSelect: "all" }}>{config.support.email}</span>
+        </div>}
         <button className="btn ghost mt16" onClick={reset}><RotateCcw size={17} /> Restaurar dados de demonstração</button>
         <button className="btn soft mt12" onClick={() => { logout(); nav("/entrar", { replace: true }); }}><LogOut size={17} /> Sair</button>
       </div>

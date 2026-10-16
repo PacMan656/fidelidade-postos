@@ -1,2 +1,5 @@
 node_modules
 dist
+# histórico de versões gerado pelo servidor (guarde em armazenamento persistente em produção)
+server/data/history
+dist-artifact

@@ -4,20 +4,20 @@ import { Trophy, UserPlus, Target, Wrench, Fuel, Droplets, Medal, Zap, User, Log
 import { c, brl } from "../../theme";
 import { Logo } from "../../components/ui";
 import { useApp } from "../../store/AppStore";
-
-const PRIZE = 250; // meta de bônus da campanha → prêmio extra
-const IDENT_PCT = 64; // % de vendas identificadas (meta 70)
+import { useConfig } from "../../config/ConfigProvider";
+import { iconOf } from "../../config/icons";
 
 function useCampaign() {
   const { s } = useApp();
+  const { config } = useConfig();
+  const camp = config.campaign || { items: [], challenges: [] };
   const fr = s.fr;
-  const bonus = fr.cadastros * 5 + fr.trocas * 8 + fr.aditivos * 3 + fr.lavagens * 4;
+  const items = camp.items || [];
+  const bonus = items.reduce((a, it) => a + (fr[it.key] || 0) * it.reward, 0);
   const metas = [
-    { Icon: UserPlus, t: "Clientes cadastrados", cur: fr.cadastros, goal: 20, rule: "+ R$ 5 por cadastro" },
-    { Icon: Target, t: "Vendas com CPF", cur: IDENT_PCT, goal: 70, pct: true, rule: "bônus ao bater 70%" },
-    { Icon: Wrench, t: "Trocas de óleo", cur: fr.trocas, goal: 10, rule: "+ R$ 8 cada" },
-    { Icon: Fuel, t: "Aditivos vendidos", cur: fr.aditivos, goal: 15, rule: "+ R$ 3 cada" },
-    { Icon: Droplets, t: "Lavagens", cur: fr.lavagens, goal: 8, rule: "+ R$ 4 cada" },
+    ...items.slice(0, 1).map((it) => ({ Icon: iconOf(it.icon), t: it.label, cur: fr[it.key] || 0, goal: it.goal, rule: `+ ${brl(it.reward)} por unidade` })),
+    ...(camp.identGoal ? [{ Icon: Target, t: "Vendas com CPF", cur: camp.identPct || 0, goal: camp.identGoal, pct: true, rule: `bônus ao bater ${camp.identGoal}%` }] : []),
+    ...items.slice(1).map((it) => ({ Icon: iconOf(it.icon), t: it.label, cur: fr[it.key] || 0, goal: it.goal, rule: `+ ${brl(it.reward)} cada` })),
   ];
   const board = [
     { name: "Marina S.", val: 240 },
@@ -25,7 +25,8 @@ function useCampaign() {
     { name: "Pedro L.", val: 120 },
     { name: `Você (${s.staff.name})`, val: bonus, me: true },
   ].sort((a, b) => b.val - a.val);
-  return { bonus, metas, board, prizePct: Math.min(100, Math.round((bonus / PRIZE) * 100)) };
+  const prize = camp.prize || 0;
+  return { camp, items, bonus, metas, board, prize, prizePct: prize ? Math.min(100, Math.round((bonus / prize) * 100)) : 0 };
 }
 
 function FrHeader({ title, sub }) {
@@ -41,39 +42,34 @@ function FrHeader({ title, sub }) {
 }
 
 function CampaignMeter() {
-  const { bonus, prizePct } = useCampaign();
+  const { bonus, prizePct, camp, prize } = useCampaign();
   return (
     <div className="dark-panel">
       <div className="row between">
-        <div className="row" style={{ gap: 6 }}><Trophy size={14} color={c.yellow} /><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: c.yellow }}>CAMPANHA DO MÊS</span></div>
-        <span style={{ fontSize: 11, color: "#caa6ad" }}>01–31</span>
+        <div className="row" style={{ gap: 6 }}><Trophy size={14} color={c.yellow} /><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: c.yellow }}>{camp.name}</span></div>
+        <span style={{ fontSize: 11, color: c.onInk1 }}>{camp.period}</span>
       </div>
       <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 10, letterSpacing: 2, color: "#b08c92", fontWeight: 700 }}>BÔNUS ACUMULADO</div>
+        <div style={{ fontSize: 10, letterSpacing: 2, color: c.onInk2, fontWeight: 700 }}>BÔNUS ACUMULADO</div>
         <div className="mono" style={{ fontSize: 42, fontWeight: 700, color: c.yellow, letterSpacing: 1, textShadow: `0 0 18px ${c.yellow}55` }}>{brl(bonus)}</div>
       </div>
       <div style={{ marginTop: 8 }}>
         <div className="bar"><div style={{ width: `${prizePct}%` }} /></div>
-        <div className="row between" style={{ marginTop: 6, fontSize: 10.5, color: "#caa6ad" }}>
-          <span>{bonus >= PRIZE ? "Meta batida! 🎉" : `Faltam ${brl(PRIZE - bonus)} p/ o prêmio`}</span>
-          <span>Prêmio: {brl(PRIZE)} + folga</span>
+        <div className="row between" style={{ marginTop: 6, fontSize: 10.5, color: c.onInk1 }}>
+          <span>{bonus >= prize ? "Meta batida! 🎉" : `Faltam ${brl(prize - bonus)} p/ o prêmio`}</span>
+          <span>Prêmio: {camp.prizeLabel || brl(prize)}</span>
         </div>
       </div>
     </div>
   );
 }
 
-const sims = [
-  { label: "+1 cadastro", k: "cadastros", msg: "Cliente cadastrado · + R$ 5", Icon: UserPlus },
-  { label: "+1 troca de óleo", k: "trocas", msg: "Troca de óleo · + R$ 8", Icon: Wrench },
-  { label: "+1 aditivo", k: "aditivos", msg: "Aditivo vendido · + R$ 3", Icon: Fuel },
-  { label: "+1 lavagem", k: "lavagens", msg: "Lavagem · + R$ 4", Icon: Droplets },
-];
 
 export function Painel() {
   const nav = useNavigate();
   const { s, bumpFr } = useApp();
-  const { board } = useCampaign();
+  const { board, items, camp } = useCampaign();
+  const first = items[0];
   const myPos = board.findIndex((b) => b.me) + 1;
   return (
     <>
@@ -93,17 +89,17 @@ export function Painel() {
           </button>
           <button className="card tile" onClick={() => nav("/frentista/metas")}>
             <Target size={18} color={c.brand} />
-            <div className="mono" style={{ fontSize: 22, fontWeight: 800, marginTop: 4 }}>{s.fr.cadastros}/20</div>
-            <div className="subtitle" style={{ fontSize: 11.5 }}>cadastros no mês</div>
+            <div className="mono" style={{ fontSize: 22, fontWeight: 800, marginTop: 4 }}>{first ? `${s.fr[first.key] || 0}/${first.goal}` : "—"}</div>
+            <div className="subtitle" style={{ fontSize: 11.5 }}>{first ? first.label.toLowerCase() : "metas"}</div>
           </button>
         </div>
 
         <div className="px mt20">
           <div className="section-title">Registrar atendimento</div>
           <div className="grid2" style={{ gap: 8 }}>
-            {sims.map((x) => (
-              <button key={x.k} className="btn sm" onClick={() => bumpFr(x.k, x.msg)} style={{ height: 46 }}><x.Icon size={16} /> {x.label}</button>
-            ))}
+            {items.map((x) => { const Icon = iconOf(x.icon); return (
+              <button key={x.key} className="btn sm" onClick={() => bumpFr(x.key, `${x.label} · + ${brl(x.reward)}`)} style={{ height: 46 }}><Icon size={16} /> {x.action}</button>
+            ); })}
           </div>
           <div className="note mt12"><Info size={16} style={{ flexShrink: 0 }} /> Demonstração: em produção esses números vêm automaticamente do PDV — o frentista só acompanha.</div>
         </div>
@@ -111,13 +107,13 @@ export function Painel() {
         <div className="px mt20">
           <div className="section-title"><Zap size={16} color={c.brand} fill={c.brand} /> Desafios da semana</div>
           <div className="col" style={{ gap: 10 }}>
-            {[{ t: "Cadastre 5 clientes hoje", r: "+ R$ 15 extra", Icon: UserPlus }, { t: "Bata 70% de identificação", r: "Bônus em dobro", Icon: Target }].map((d, i) => (
+            {(camp.challenges || []).map((d, i) => { const Icon = iconOf(d.icon); return (
               <div key={i} className="card row" style={{ gap: 12, padding: 13 }}>
-                <div className="icon-box" style={{ width: 38, height: 38, borderRadius: 11, background: c.ink }}><d.Icon size={17} color={c.yellow} /></div>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{d.t}</span>
-                <span style={{ fontSize: 11.5, fontWeight: 800, color: c.brandDeep, whiteSpace: "nowrap" }}>{d.r}</span>
+                <div className="icon-box" style={{ width: 38, height: 38, borderRadius: 11, background: c.ink }}><Icon size={17} color={c.yellow} /></div>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{d.title}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: c.brandDeep, whiteSpace: "nowrap" }}>{d.reward}</span>
               </div>
-            ))}
+            ); })}
           </div>
         </div>
       </div>
@@ -161,20 +157,21 @@ export function Metas() {
 }
 
 export function Ranking() {
-  const { board } = useCampaign();
+  const { board, camp } = useCampaign();
+  const staffStation = useApp().s.staff.station;
   const top = board.slice(0, 3);
   const podium = [top[1], top[0], top[2]];
   const heights = [96, 128, 76];
   return (
     <>
-      <FrHeader title="Ranking" sub="Campanha do mês · Posto Centro" />
+      <FrHeader title="Ranking" sub={`${camp.name || "Campanha"} · Posto ${staffStation}`} />
       <div className="scroll with-nav screen-enter">
         <div className="px">
           <div className="dark-panel row" style={{ alignItems: "flex-end", justifyContent: "center", gap: 10, paddingTop: 24 }}>
             {podium.map((p, i) => p && (
               <div key={p.name} className="col" style={{ alignItems: "center", flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: p.me ? c.yellow : "#fff", textAlign: "center" }}>{p.name}</div>
-                <div className="mono" style={{ fontSize: 12, color: "#caa6ad", marginBottom: 6 }}>{brl(p.val)}</div>
+                <div className="mono" style={{ fontSize: 12, color: c.onInk1, marginBottom: 6 }}>{brl(p.val)}</div>
                 <div className="row center" style={{ width: "100%", height: heights[i], borderRadius: "12px 12px 0 0", background: i === 1 ? `linear-gradient(${c.yellow}, #C99A00)` : "rgba(255,255,255,.12)" }}>
                   <span className="mono" style={{ fontSize: 22, fontWeight: 900, color: i === 1 ? c.ink : "#fff" }}>{i === 1 ? 1 : i === 0 ? 2 : 3}º</span>
                 </div>

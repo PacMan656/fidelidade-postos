@@ -1,26 +1,30 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Coins, Plus, Fuel, CreditCard, AlertCircle, Check, Trash2, Star, Ticket, ChevronRight } from "lucide-react";
-import { c, brl, num, PIX_KEY, PIX_PAYLOAD } from "../../theme";
+import { c, brl, num } from "../../theme";
 import { HomeHeader, Screen, FakeQR, PixGlyph, seedOf } from "../../components/ui";
 import { useApp } from "../../store/AppStore";
-import { partners } from "../../store/data";
+import { useConfig } from "../../config/ConfigProvider";
+
+const multLabel = (m) => (m === 2 ? "em dobro" : m === 3 ? "em triplo" : m > 1 ? `${m}×` : "");
 
 export default function Carteira() {
   const nav = useNavigate();
   const { s } = useApp();
+  const { config } = useConfig();
+  const mult = config.points?.appMultiplier || 1;
   return (
     <>
       <HomeHeader />
       <div className="scroll with-nav screen-enter">
         <div className="px" style={{ paddingBottom: 6 }}>
-          <div className="title">Carteira Dona Rosa</div>
-          <div className="subtitle">Pague pelo app e ganhe pontos em dobro</div>
+          <div className="title">{config.texts?.walletName}</div>
+          <div className="subtitle">{mult > 1 ? `Pague pelo app e ganhe pontos ${multLabel(mult)}` : "Pague pelo app e acumule pontos"}</div>
         </div>
 
         <div className="px mt8">
           <div className="red-panel">
-            <div className="row" style={{ gap: 6 }}><Coins size={14} color={c.yellow} /><span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, color: "#ffe0c9" }}>SALDO PRÉ-PAGO</span></div>
+            <div className="row" style={{ gap: 6 }}><Coins size={14} color={c.yellow} /><span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, color: c.onBrand }}>SALDO PRÉ-PAGO</span></div>
             <div className="mono" style={{ fontSize: 38, fontWeight: 700, marginTop: 6 }}>{brl(s.prepaid)}</div>
             <div className="grid2" style={{ gap: 10, marginTop: 14 }}>
               <button onClick={() => nav("/carteira/adicionar-credito")} className="btn sm" style={{ height: 44, background: c.yellow, color: c.ink }}><Plus size={17} /> Adicionar</button>
@@ -36,7 +40,7 @@ export default function Carteira() {
           </div>
           <div className="col" style={{ gap: 10 }}>
             {s.cards.map((card, i) => <CardRow key={card.id} card={card} main={i === 0} />)}
-            <button onClick={() => nav("/carteira/adicionar-cartao")} className="row center" style={{ gap: 8, padding: 14, borderRadius: 15, border: `1.5px dashed ${c.brand}`, background: "#FFF6F0", color: c.brand, fontSize: 14, fontWeight: 800 }}>
+            <button onClick={() => nav("/carteira/adicionar-cartao")} className="row center" style={{ gap: 8, padding: 14, borderRadius: 15, border: `1.5px dashed ${c.brand}`, background: c.pinkSoft, color: c.brand, fontSize: 14, fontWeight: 800 }}>
               <Plus size={18} /> Adicionar cartão
             </button>
           </div>
@@ -47,7 +51,8 @@ export default function Carteira() {
             <div className="eyebrow">CUPONS GUARDADOS</div>
             <div className="list-card">
               {s.coupons.map((cp) => {
-                const p = partners.find((x) => x.id === cp.partnerId);
+                const p = config.partners.find((x) => x.id === cp.partnerId);
+                if (!p) return null;
                 return (
                   <button key={cp.code} onClick={() => nav(`/clube/${p.id}`)} className="row" style={{ gap: 12, padding: 13, width: "100%", textAlign: "left" }}>
                     <Ticket size={18} color={c.brandDeep} />
@@ -109,11 +114,14 @@ export function Cartoes() {
 export function AdicionarCredito() {
   const nav = useNavigate();
   const { s, addCredit, flash } = useApp();
+  const { config } = useConfig();
+  const pix = config.pix || {};
+  const pixOn = config.features?.pix !== false && !!pix.key;
   const [amt, setAmt] = useState(100);
-  const [method, setMethod] = useState("pix");
+  const [method, setMethod] = useState(pixOn ? "pix" : "card");
   const main = s.cards[0];
 
-  const copyPix = () => { try { navigator.clipboard?.writeText(PIX_PAYLOAD); } catch (e) {} flash("Código Pix copiado"); };
+  const copyPix = () => { try { navigator.clipboard?.writeText(pix.payload); } catch (e) {} flash("Código Pix copiado"); };
   const confirm = () => { if (addCredit(amt, method)) nav("/carteira", { replace: true }); };
 
   return (
@@ -123,7 +131,7 @@ export function AdicionarCredito() {
 
         <div className="field-label mt16">Forma de pagamento</div>
         <div className="grid2" style={{ gap: 8 }}>
-          <button className={`choice ${method === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")}><PixGlyph /> Pix</button>
+          {pixOn && <button className={`choice ${method === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")}><PixGlyph /> Pix</button>}
           <button className={`choice ${method === "card" ? "on" : ""}`} onClick={() => setMethod("card")} disabled={!main}><CreditCard size={16} color={c.brandDeep} /> Cartão</button>
         </div>
 
@@ -141,16 +149,18 @@ export function AdicionarCredito() {
             <div className="card mt16" style={{ textAlign: "center" }}>
               <div className="row center" style={{ gap: 6, marginBottom: 10 }}><PixGlyph /><span style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1 }}>PAGUE COM PIX</span></div>
               <div className="row center"><FakeQR size={160} seed={seedOf(amt)} /></div>
-              <div style={{ fontSize: 12, color: c.muted, marginTop: 10 }}>Chave Pix do posto (CNPJ)</div>
-              <div className="mono" style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{PIX_KEY}</div>
+              <div style={{ fontSize: 12, color: c.muted, marginTop: 10 }}>{pix.keyLabel}</div>
+              <div className="mono" style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{pix.key}</div>
               <div className="row" style={{ marginTop: 10, padding: "9px 10px", borderRadius: 10, background: c.cream, border: `1px solid ${c.line}`, gap: 8 }}>
-                <span className="mono" style={{ fontSize: 11, color: c.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{PIX_PAYLOAD}</span>
+                <span className="mono" style={{ fontSize: 11, color: c.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{pix.payload}</span>
                 <button onClick={copyPix} style={{ padding: "6px 11px", borderRadius: 9, background: c.ink, color: "#fff", fontSize: 12, fontWeight: 800 }}>Copiar</button>
               </div>
             </div>
             <button className="btn mt12" onClick={confirm}>Já fiz o Pix · adicionar {brl(amt)}</button>
             <div className="subtitle" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center", lineHeight: 1.4 }}>Em produção, a confirmação do Pix entra automática e o crédito cai em segundos.</div>
           </>
+        ) : !main ? (
+          <div className="note mt16"><AlertCircle size={16} style={{ flexShrink: 0 }} /> Cadastre um cartão na carteira para adicionar crédito.</div>
         ) : (
           <>
             <div className="card row mt16" style={{ gap: 10 }}>
@@ -170,6 +180,7 @@ const maskVal = (v) => v.replace(/\D/g, "").slice(0, 4).replace(/(\d{2})(\d)/, "
 export function AdicionarCartao() {
   const nav = useNavigate();
   const { addCard } = useApp();
+  const { config } = useConfig();
   const [cf, setCf] = useState({ num: "", name: "", val: "", cvv: "", kind: "Crédito" });
   const digits = cf.num.replace(/\D/g, "");
 
@@ -181,11 +192,11 @@ export function AdicionarCartao() {
         {/* pré-visualização */}
         <div className="dark-panel" style={{ height: 180, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div className="row between">
-            <span style={{ fontSize: 13, fontWeight: 900, fontStyle: "italic", color: c.yellow }}>DONA ROSA</span>
-            <span style={{ fontSize: 11, fontWeight: 800, color: "#caa6ad" }}>{cf.kind.toUpperCase()}</span>
+            <span style={{ fontSize: 13, fontWeight: 900, fontStyle: "italic", color: c.yellow }}>{config.brand.wordmark}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: c.onInk1 }}>{cf.kind.toUpperCase()}</span>
           </div>
           <div className="mono" style={{ fontSize: 20, letterSpacing: 2 }}>{(cf.num || "•••• •••• •••• ••••")}</div>
-          <div className="row between" style={{ fontSize: 12, color: "#dcc3c8" }}>
+          <div className="row between" style={{ fontSize: 12, color: c.onInk0 }}>
             <span style={{ textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70%" }}>{cf.name || "NOME NO CARTÃO"}</span>
             <span className="mono">{cf.val || "MM/AA"}</span>
           </div>
@@ -216,10 +227,12 @@ export function AdicionarCartao() {
 export function Pagar() {
   const nav = useNavigate();
   const { s, pay } = useApp();
+  const { config } = useConfig();
+  const mult = config.points?.appMultiplier || 1;
   const [amt, setAmt] = useState(150);
   const [method, setMethod] = useState(s.prepaid >= 150 || !s.cards.length ? "prepaid" : "card");
   const main = s.cards[0];
-  const pts = Math.round(Number(amt) || 0) * 2;
+  const pts = Math.round((Number(amt) || 0) * (config.points?.perReal || 1) * mult);
 
   const submit = () => {
     const r = pay(amt, method);
@@ -229,7 +242,7 @@ export function Pagar() {
   return (
     <Screen title="Pagar no posto">
       <div className="px">
-        <div className="subtitle">Pague pelo app e receba pontos em dobro</div>
+        <div className="subtitle">{mult > 1 ? `Pague pelo app e receba pontos ${multLabel(mult)}` : "Pague pelo app e acumule pontos"}</div>
         <div className="mt16">
           <label className="field-label" htmlFor="pay">Valor do abastecimento</label>
           <input id="pay" className="field mono" type="number" min="1" value={amt} onChange={(e) => setAmt(e.target.value)} style={{ fontSize: 22, height: 56, fontWeight: 700 }} />
@@ -268,6 +281,7 @@ export function Comprovante() {
   const nav = useNavigate();
   const { state } = useLocation();
   const { s } = useApp();
+  const { config } = useConfig();
   if (!state) return <Screen title="Comprovante"><div className="px subtitle">Nenhum pagamento recente.</div></Screen>;
   const card = s.cards[0];
   return (
@@ -281,7 +295,7 @@ export function Comprovante() {
             ["Forma", state.method === "prepaid" ? "Saldo pré-pago" : card ? `${card.brand} •••• ${card.last4}` : "Cartão"],
             ["Autorização", state.auth],
             ["Data", new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })],
-            ["Posto", "Dona Rosa · Centro"],
+            ["Posto", `${config.brand.name} · ${config.stations?.[0] || ""}`],
           ].map(([k, v]) => (
             <div key={k} className="row between" style={{ padding: "7px 0", fontSize: 13 }}>
               <span style={{ color: c.muted }}>{k}</span><span className="mono" style={{ fontWeight: 700 }}>{v}</span>
@@ -289,7 +303,7 @@ export function Comprovante() {
           ))}
         </div>
         <div className="row between mt12" style={{ padding: "12px 14px", borderRadius: 12, background: c.ink }}>
-          <span style={{ fontSize: 13, color: "#dcc3c8", fontWeight: 700 }}>Pontos creditados (2×)</span>
+          <span style={{ fontSize: 13, color: c.onInk0, fontWeight: 700 }}>Pontos creditados{(config.points?.appMultiplier || 1) > 1 ? ` (${config.points.appMultiplier}×)` : ""}</span>
           <span className="mono" style={{ fontSize: 20, fontWeight: 700, color: c.yellow }}>+{num(state.pts)}</span>
         </div>
         <button className="btn mt20" onClick={() => nav("/inicio", { replace: true })}>Voltar ao início</button>

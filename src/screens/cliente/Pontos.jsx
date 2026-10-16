@@ -4,11 +4,22 @@ import { Zap, Receipt, AlertCircle, ArrowUpRight, ArrowDownLeft, Check, Ticket, 
 import { c, num } from "../../theme";
 import { HomeHeader, Screen, FakeQR, PointsMeter, Empty, seedOf } from "../../components/ui";
 import { useApp } from "../../store/AppStore";
-import { rewards, partners } from "../../store/data";
+import { useConfig } from "../../config/ConfigProvider";
+import { iconOf } from "../../config/icons";
+
+const useCatalog = () => {
+  const { config } = useConfig();
+  return {
+    config,
+    rewards: (config.rewards || []).filter((r) => r.active !== false),
+    partners: (config.partners || []).filter((p) => p.active !== false),
+  };
+};
 
 /* ---------- QR de identificação ---------- */
 export function MeuQR() {
   const { s } = useApp();
+  const { config } = useConfig();
   const [bright, setBright] = useState(false);
   return (
     <Screen title="Meu QR Code">
@@ -21,9 +32,9 @@ export function MeuQR() {
           </div>
         </div>
         <div className="mono" style={{ fontSize: 14, color: c.muted }}>{s.user.fullName} · CPF {s.user.cpf}</div>
-        {s.offerActive && (
+        {s.offerActive && config.offer?.active && (
           <div className="row center mt16" style={{ padding: "11px 14px", borderRadius: 13, background: c.pinkSoft, color: c.brandDeep, fontSize: 13, fontWeight: 700, gap: 7 }}>
-            <Zap size={15} fill={c.brandDeep} /> Desconto ativo: −R$ 0,20 / litro
+            <Zap size={15} fill={c.brandDeep} /> {config.offer?.qrBadge}
           </div>
         )}
         {s.banked.length > 0 && (
@@ -41,6 +52,7 @@ export function MeuQR() {
 /* ---------- Extrato ---------- */
 export function Extrato() {
   const { s } = useApp();
+  const { config } = useConfig();
   const [filter, setFilter] = useState("todos");
   const list = s.tx.filter((t) => filter === "todos" || t.kind === filter);
   const ganhos = s.tx.filter((t) => t.kind === "in").reduce((a, t) => a + t.v, 0);
@@ -53,9 +65,9 @@ export function Extrato() {
           <div className="card"><div style={{ fontSize: 11, color: c.muted, fontWeight: 700 }}>GANHOS</div><div className="mono" style={{ fontSize: 18, fontWeight: 800, color: c.green }}>+{num(ganhos)}</div></div>
           <div className="card"><div style={{ fontSize: 11, color: c.muted, fontWeight: 700 }}>RESGATADOS</div><div className="mono" style={{ fontSize: 18, fontWeight: 800, color: c.danger }}>−{num(usados)}</div></div>
         </div>
-        <div className="row mt12" style={{ gap: 6, fontSize: 12, color: "#7C6210", fontWeight: 600 }}>
-          <AlertCircle size={14} color="#9A7714" /> 180 pontos expiram em 12 dias
-        </div>
+        {config.points?.expiringNotice && <div className="row mt12" style={{ gap: 6, fontSize: 12, color: "#7C6210", fontWeight: 600 }}>
+          <AlertCircle size={14} color="#9A7714" /> {config.points.expiringNotice}
+        </div>}
         <div className="segmented mt12">
           {[["todos", "Todos"], ["in", "Entradas"], ["out", "Saídas"]].map(([k, l]) => (
             <button key={k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>{l}</button>
@@ -79,11 +91,12 @@ export function Extrato() {
 }
 
 /* ---------- Resgatar (aba) ---------- */
-const cats = ["Todos", "Serviço auto", "Serviço", "Produto", "Conveniência"];
 
 export default function Resgatar() {
   const nav = useNavigate();
   const { s } = useApp();
+  const { rewards } = useCatalog();
+  const cats = ["Todos", ...new Set(rewards.map((r) => r.cat))];
   const [cat, setCat] = useState("Todos");
   const list = rewards.filter((r) => cat === "Todos" || r.cat === cat);
   return (
@@ -107,9 +120,10 @@ export default function Resgatar() {
         <div className="grid2 px mt12">
           {list.map((r) => {
             const ok = s.points >= r.cost;
+            const Icon = iconOf(r.icon);
             return (
               <button key={r.id} className="card tile" onClick={() => nav(`/resgatar/${r.id}`)} style={{ borderRadius: 18, opacity: ok ? 1 : 0.65 }}>
-                <div className="icon-box" style={{ width: 44, height: 44, borderRadius: 13, background: c.cream, marginBottom: 10 }}><r.Icon size={22} color={r.hue} /></div>
+                <div className="icon-box" style={{ width: 44, height: 44, borderRadius: 13, background: c.cream, marginBottom: 10 }}><Icon size={22} color={r.hue} /></div>
                 <div style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.2 }}>{r.name}</div>
                 <div style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>{r.cat}</div>
                 <div className="row" style={{ gap: 4, marginTop: 8 }}><span className="mono" style={{ fontSize: 16, fontWeight: 700 }}>{num(r.cost)}</span><span style={{ fontSize: 11, color: c.muted }}>pts</span></div>
@@ -127,10 +141,12 @@ export function DetalhePremio() {
   const { id } = useParams();
   const nav = useNavigate();
   const { s, redeem } = useApp();
+  const { rewards, config } = useCatalog();
   const r = rewards.find((x) => x.id === id);
   const [confirming, setConfirming] = useState(false);
   if (!r) return <Screen title="Prêmio"><Empty Icon={Gift} title="Prêmio não encontrado" text="Ele pode ter saído do catálogo." /></Screen>;
   const ok = s.points >= r.cost;
+  const Icon = iconOf(r.icon);
 
   const go = () => {
     const v = redeem(r);
@@ -141,7 +157,7 @@ export function DetalhePremio() {
     <Screen title="Detalhes do prêmio">
       <div className="px">
         <div className="row center" style={{ height: 170, borderRadius: 22, background: c.paper, border: `1px solid ${c.line}` }}>
-          <div className="icon-box" style={{ width: 88, height: 88, borderRadius: 28, background: c.cream }}><r.Icon size={44} color={r.hue} /></div>
+          <div className="icon-box" style={{ width: 88, height: 88, borderRadius: 28, background: c.cream }}><Icon size={44} color={r.hue} /></div>
         </div>
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: c.muted, marginTop: 16 }}>{r.cat.toUpperCase()}</div>
         <div className="title" style={{ marginTop: 2 }}>{r.name}</div>
@@ -149,11 +165,11 @@ export function DetalhePremio() {
         <p style={{ fontSize: 14, lineHeight: 1.5, color: c.ink2 }}>{r.desc}</p>
         <div className="card col" style={{ gap: 8, fontSize: 13 }}>
           <div className="row" style={{ gap: 8 }}><Info size={15} color={c.muted} /> Válido por 30 dias após o resgate</div>
-          <div className="row" style={{ gap: 8 }}><MapPin size={15} color={c.muted} /> Postos Dona Rosa Centro e Rodovia</div>
+          <div className="row" style={{ gap: 8 }}><MapPin size={15} color={c.muted} /> {config.brand.name} · {(config.stations || []).join(", ")}</div>
         </div>
 
         <div className="row between mt16" style={{ padding: "12px 14px", borderRadius: 12, background: c.ink }}>
-          <span style={{ fontSize: 12.5, color: "#dcc3c8" }}>Saldo após o resgate</span>
+          <span style={{ fontSize: 12.5, color: c.onInk0 }}>Saldo após o resgate</span>
           <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: ok ? c.yellow : "#ff8a95" }}>{num(s.points - r.cost)} pts</span>
         </div>
 
@@ -225,6 +241,7 @@ export function Voucher() {
 export function Clube() {
   const nav = useNavigate();
   const { s, level } = useApp();
+  const { partners } = useCatalog();
   return (
     <>
       <HomeHeader />
@@ -235,16 +252,17 @@ export function Clube() {
         </div>
         <div className="px mt8">
           <div style={{ borderRadius: 18, padding: 16, background: `linear-gradient(135deg, ${c.brandDeep}, ${c.brand})` }}>
-            <div className="row" style={{ gap: 7 }}><Gift size={15} color={c.yellow} /><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: "#ffe0c9" }}>EXCLUSIVO NÍVEL {level.name.toUpperCase()}</span></div>
+            <div className="row" style={{ gap: 7 }}><Gift size={15} color={c.yellow} /><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: c.onBrand }}>EXCLUSIVO NÍVEL {level.name.toUpperCase()}</span></div>
             <div style={{ fontSize: 17, fontWeight: 800, color: "#fff", marginTop: 6 }}>Cupons que pagam seu dia a dia</div>
           </div>
         </div>
         <div className="col px mt16" style={{ gap: 11 }}>
           {partners.map((p) => {
+            const Icon = iconOf(p.icon);
             const saved = s.coupons.some((x) => x.partnerId === p.id);
             return (
               <button key={p.id} className="card row tile" style={{ gap: 13 }} onClick={() => nav(`/clube/${p.id}`)}>
-                <div className="icon-box" style={{ width: 44, height: 44, borderRadius: 13, background: c.cream }}><p.Icon size={21} color={p.hue} /></div>
+                <div className="icon-box" style={{ width: 44, height: 44, borderRadius: 13, background: c.cream }}><Icon size={21} color={p.hue} /></div>
                 <div style={{ flex: 1 }}><div style={{ fontSize: 14, fontWeight: 700 }}>{p.name}</div><div style={{ fontSize: 12.5, color: c.brandDeep, fontWeight: 700 }}>{p.offer}</div></div>
                 {saved ? <span className="chip" style={{ background: "#E7F4EC", color: c.green }}>GUARDADO</span> : <span style={{ padding: "8px 14px", borderRadius: 11, border: `1px solid ${c.line}`, background: c.cream, fontSize: 12.5, fontWeight: 800 }}>Ver</span>}
               </button>
@@ -259,18 +277,20 @@ export function Clube() {
 export function DetalheParceiro() {
   const { id } = useParams();
   const { s, saveCoupon } = useApp();
+  const { partners } = useCatalog();
   const p = partners.find((x) => x.id === id);
   if (!p) return <Screen title="Parceiro"><Empty Icon={Gift} title="Parceiro não encontrado" text="Ele pode ter saído do clube." /></Screen>;
+  const Icon = iconOf(p.icon);
   const coupon = s.coupons.find((x) => x.partnerId === p.id);
   return (
     <Screen title="Parceiro">
       <div className="px">
         <div className="card row" style={{ gap: 14, padding: 16 }}>
-          <div className="icon-box" style={{ width: 60, height: 60, borderRadius: 18, background: c.cream }}><p.Icon size={28} color={p.hue} /></div>
+          <div className="icon-box" style={{ width: 60, height: 60, borderRadius: 18, background: c.cream }}><Icon size={28} color={p.hue} /></div>
           <div><div style={{ fontSize: 17, fontWeight: 800 }}>{p.name}</div><div className="row subtitle" style={{ gap: 4, marginTop: 3 }}><MapPin size={13} /> {p.address}</div></div>
         </div>
         <div className="red-panel mt16" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: "#ffe0c9" }}>SEU BENEFÍCIO</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: c.onBrand }}>SEU BENEFÍCIO</div>
           <div style={{ fontSize: 26, fontWeight: 900, marginTop: 4 }}>{p.offer}</div>
         </div>
         <div className="eyebrow mt20">REGRAS</div>

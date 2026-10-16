@@ -1,14 +1,21 @@
 import React from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, Navigate } from "react-router-dom";
+import { useConfig } from "../config/ConfigProvider";
 import { Home, Wallet, Gift, Star, QrCode, LayoutDashboard, Target, Medal, User } from "lucide-react";
 
-const clienteNav = [
+const clienteNav = (f) => [
   { to: "/inicio", label: "Início", Icon: Home },
-  { to: "/carteira", label: "Carteira", Icon: Wallet },
-  null,
+  f.wallet && { to: "/carteira", label: "Carteira", Icon: Wallet },
+  "qr",
   { to: "/resgatar", label: "Resgatar", Icon: Gift },
-  { to: "/clube", label: "Clube", Icon: Star },
-];
+  f.club && { to: "/clube", label: "Clube", Icon: Star },
+].filter(Boolean);
+
+/** Bloqueia rotas de recursos desligados na configuração da rede */
+export function RequireFeature({ name }) {
+  const { config } = useConfig();
+  return config.features?.[name] === false ? <Navigate to="/inicio" replace /> : <Outlet />;
+}
 
 function NavItem({ to, label, Icon }) {
   return (
@@ -22,12 +29,13 @@ function NavItem({ to, label, Icon }) {
 /* Abas do cliente com o botão central de QR */
 export function ClienteTabs() {
   const nav = useNavigate();
+  const { config } = useConfig();
   return (
     <>
       <Outlet />
       <nav className="bottom-nav">
-        {clienteNav.map((n, i) =>
-          n ? <NavItem key={n.to} {...n} /> : (
+        {clienteNav(config.features || {}).map((n, i) =>
+          n !== "qr" ? <NavItem key={n.to} {...n} /> : (
             <div key={i} style={{ flex: 1, display: "flex", justifyContent: "center" }}>
               <button className="nav-fab" onClick={() => nav("/qr")} aria-label="Meu QR Code"><QrCode size={26} color="#fff" /></button>
             </div>
