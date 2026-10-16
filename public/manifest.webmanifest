@@ -1,0 +1,9 @@
+{
+  "name": "Postos Dona Rosa",
+  "short_name": "Dona Rosa",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#FBF5EC",
+  "theme_color": "#D81E2C",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
