@@ -58,7 +58,8 @@
   "points": {
     "perReal": 1,
     "appMultiplier": 2,
-    "expiringNotice": "180 pontos expiram em 12 dias"
+    "expirationMonths": 12,
+    "welcomeBonus": 200
   },
   "levels": [
     {
@@ -85,7 +86,10 @@
       20,
       30,
       50
-    ]
+    ],
+    "minLiters": 5,
+    "maxLiters": 200,
+    "maxActiveLiters": 300
   },
   "offer": {
     "active": true,
@@ -94,12 +98,17 @@
     "unit": "por litro",
     "description": "Etanol e gasolina · todas as unidades",
     "until": "até 20h",
-    "qrBadge": "Desconto ativo: −R$ 0,15 / litro"
+    "qrBadge": "Desconto ativo: −R$ 0,15 / litro",
+    "discountPerLiter": 0.15,
+    "endsAtHour": 20,
+    "maxLitersPerDay": 100
   },
   "pix": {
     "key": "98.765.432/0001-10",
     "keyLabel": "Chave Pix da rede (CNPJ)",
-    "payload": "00020126360014BR.GOV.BCB.PIX0114987654320001105204000053039865802BR5912REDE AVENIDA6009SAO PAULO62070503***6304B2C3"
+    "payload": "00020126360014BR.GOV.BCB.PIX0114987654320001105204000053039865802BR5912REDE AVENIDA6009SAO PAULO62070503***6304B2C3",
+    "merchantName": "REDE AVENIDA",
+    "merchantCity": "SAO PAULO"
   },
   "rewards": [
     {
@@ -110,7 +119,9 @@
       "icon": "Droplets",
       "hue": "#2C82C9",
       "desc": "Lavagem externa, aspiração interna, pretinho nos pneus e secagem.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "checkup",
@@ -120,7 +131,9 @@
       "icon": "Gauge",
       "hue": "#8A5BD6",
       "desc": "Calibragem dos 4 pneus e estepe, verificação de fluidos, palhetas e luzes.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "cafe",
@@ -130,7 +143,9 @@
       "icon": "Coffee",
       "hue": "#C0703B",
       "desc": "Um café expresso médio e um salgado ou snack à sua escolha na conveniência.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "vale10",
@@ -140,7 +155,9 @@
       "icon": "ShoppingBag",
       "hue": "#D45B86",
       "desc": "Crédito de R$ 10 para usar em qualquer produto da loja de conveniência.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "ducha",
@@ -150,7 +167,9 @@
       "icon": "Droplets",
       "hue": "#0E5FD8",
       "desc": "Ducha externa com secagem, em qualquer unidade.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     }
   ],
   "partners": [
@@ -206,7 +225,6 @@
     "period": "01–31 out",
     "prize": 300,
     "prizeLabel": "R$ 300",
-    "identPct": 64,
     "identGoal": 70,
     "items": [
       {
@@ -253,10 +271,34 @@
         "reward": "Bônus em dobro",
         "icon": "Target"
       }
-    ]
+    ],
+    "id": "2026-10",
+    "startsAt": "2026-10-01",
+    "endsAt": "2026-10-31"
   },
   "support": {
     "phone": "(11) 3000-9876",
     "email": "atendimento@redeavenida.com.br"
-  }
+  },
+  "wallet": {
+    "minCredit": 10,
+    "maxCredit": 1000,
+    "maxBalance": 2000,
+    "pixExpirationMinutes": 30
+  },
+  "vouchers": {
+    "validityDays": 30
+  },
+  "maintenance": {
+    "slotCapacity": 2,
+    "hours": [
+      "08:00",
+      "09:30",
+      "11:00",
+      "13:30",
+      "15:00",
+      "16:30"
+    ]
+  },
+  "status": "active"
 }

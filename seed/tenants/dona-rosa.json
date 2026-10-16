@@ -58,7 +58,8 @@
   "points": {
     "perReal": 1,
     "appMultiplier": 2,
-    "expiringNotice": "180 pontos expiram em 12 dias"
+    "expirationMonths": 12,
+    "welcomeBonus": 200
   },
   "levels": [
     {
@@ -89,7 +90,10 @@
       20,
       30,
       50
-    ]
+    ],
+    "minLiters": 5,
+    "maxLiters": 200,
+    "maxActiveLiters": 300
   },
   "offer": {
     "active": true,
@@ -98,12 +102,17 @@
     "unit": "por litro",
     "description": "Gasolina, etanol e diesel · postos Centro e Rodovia",
     "until": "até 23h",
-    "qrBadge": "Desconto ativo: −R$ 0,20 / litro"
+    "qrBadge": "Desconto ativo: −R$ 0,20 / litro",
+    "discountPerLiter": 0.2,
+    "endsAtHour": 23,
+    "maxLitersPerDay": 100
   },
   "pix": {
     "key": "12.345.678/0001-90",
     "keyLabel": "Chave Pix do posto (CNPJ)",
-    "payload": "00020126360014BR.GOV.BCB.PIX0114123456780001905204000053039865802BR5913POSTO DONAROSA6009GUADALUPE62070503***6304A1B2"
+    "payload": "00020126360014BR.GOV.BCB.PIX0114123456780001905204000053039865802BR5913POSTO DONAROSA6009GUADALUPE62070503***6304A1B2",
+    "merchantName": "POSTO DONA ROSA",
+    "merchantCity": "GUADALUPE"
   },
   "rewards": [
     {
@@ -114,7 +123,9 @@
       "icon": "Wrench",
       "hue": "#D81E2C",
       "desc": "Troca de óleo do motor com óleo sintético 5W30 (até 4 L) e mão de obra inclusa.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": 1
     },
     {
       "id": "lavagem",
@@ -124,7 +135,9 @@
       "icon": "Droplets",
       "hue": "#2C82C9",
       "desc": "Lavagem externa, aspiração interna, pretinho nos pneus e secagem.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "checkup",
@@ -134,7 +147,9 @@
       "icon": "Gauge",
       "hue": "#8A5BD6",
       "desc": "Calibragem dos 4 pneus e estepe, verificação de fluidos, palhetas e luzes.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "aditivo",
@@ -144,7 +159,9 @@
       "icon": "Fuel",
       "hue": "#E08A1E",
       "desc": "Um frasco de aditivo limpador do sistema de injeção, aplicado no abastecimento.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "cafe",
@@ -154,7 +171,9 @@
       "icon": "Coffee",
       "hue": "#C0703B",
       "desc": "Um café expresso médio e um salgado ou snack à sua escolha na conveniência.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     },
     {
       "id": "vale10",
@@ -164,7 +183,9 @@
       "icon": "ShoppingBag",
       "hue": "#D45B86",
       "desc": "Crédito de R$ 10 para usar em qualquer produto da loja de conveniência.",
-      "active": true
+      "active": true,
+      "stock": null,
+      "limitPerMonth": null
     }
   ],
   "partners": [
@@ -240,7 +261,6 @@
     "period": "01–31 out",
     "prize": 250,
     "prizeLabel": "R$ 250 + folga",
-    "identPct": 64,
     "identGoal": 70,
     "items": [
       {
@@ -287,10 +307,34 @@
         "reward": "Bônus em dobro",
         "icon": "Target"
       }
-    ]
+    ],
+    "id": "2026-10",
+    "startsAt": "2026-10-01",
+    "endsAt": "2026-10-31"
   },
   "support": {
     "phone": "(11) 4000-1234",
     "email": "contato@donarosa.com.br"
-  }
+  },
+  "wallet": {
+    "minCredit": 10,
+    "maxCredit": 1000,
+    "maxBalance": 2000,
+    "pixExpirationMinutes": 30
+  },
+  "vouchers": {
+    "validityDays": 30
+  },
+  "maintenance": {
+    "slotCapacity": 2,
+    "hours": [
+      "08:00",
+      "09:30",
+      "11:00",
+      "13:30",
+      "15:00",
+      "16:30"
+    ]
+  },
+  "status": "active"
 }

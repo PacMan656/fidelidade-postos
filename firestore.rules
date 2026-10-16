@@ -1,0 +1,74 @@
+rules_version = '2';
+
+// Regras de segurança — docs/REGRAS_DE_NEGOCIO.md
+// RN-64: o app nunca escreve saldo, pontos, vouchers ou vendas; só as Cloud Functions (Admin SDK) escrevem.
+// RN-65: cada cliente lê apenas os próprios dados; equipe lê o que precisa para operar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.get('platformAdmin', false) == true; }
+    function roleIn(t) { return signedIn() ? request.auth.token.get('roles', {}).get(t, '') : ''; }
+    function isStaff(t) { return isAdmin() || roleIn(t) in ['attendant', 'manager', 'owner']; }
+    function isManager(t) { return isAdmin() || roleIn(t) in ['manager', 'owner']; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function ownsDoc(field) { return signedIn() && resource.data[field] == request.auth.uid; }
+
+    // domínio → rede (descoberta da rede pelo endereço)
+    match /domains/{host} {
+      allow read: if true;
+    }
+
+    match /tenants/{t} {
+      // configuração pública da rede (marca, preços, prêmios…)
+      allow read: if true;
+
+      match /configHistory/{version} { allow read: if isManager(t); }
+      match /audit/{id}              { allow read: if isManager(t); }
+      match /staff/{uid}             { allow read: if isManager(t) || isSelf(uid); }
+      match /campaigns/{c}/staff/{uid} { allow read: if isStaff(t); }
+
+      match /customers/{uid} {
+        allow read: if isSelf(uid) || isManager(t);
+
+        match /ledger/{id}      { allow read: if isSelf(uid) || isManager(t); }
+        match /wallet/{id}      { allow read: if isSelf(uid) || isManager(t); }
+        match /fuelLocks/{id}   { allow read: if isSelf(uid) || isManager(t); }
+        match /cards/{id}       { allow read: if isSelf(uid); }
+        match /maintenance/{id} { allow read: if isSelf(uid); }
+        match /offers/{id}      { allow read: if isSelf(uid); }
+        match /coupons/{id}     { allow read: if isSelf(uid); }
+        match /rewardUsage/{id} { allow read: if isSelf(uid); }
+
+        // RN-63: o cliente só marca como lida
+        match /notifications/{id} {
+          allow read: if isSelf(uid);
+          allow update: if isSelf(uid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+            && request.resource.data.read is bool;
+        }
+      }
+
+      // frentista consulta um voucher pelo código; listar todos é só para gerente ou o próprio dono
+      match /vouchers/{code} {
+        allow get: if isStaff(t) || ownsDoc('customerUid');
+        allow list: if isManager(t) || ownsDoc('customerUid');
+      }
+
+      match /sales/{id} {
+        allow read: if isManager(t) || ownsDoc('customerUid') || ownsDoc('attendantUid');
+      }
+
+      match /appointments/{id} {
+        allow read: if isStaff(t) || ownsDoc('customerUid');
+      }
+
+      match /pixCharges/{txid} {
+        allow read: if isManager(t) || ownsDoc('uid');
+      }
+
+      // cpfIndex, cardTokens, staffCodes, rewardStock, slots, operations, pixEvents:
+      // sem acesso pelo cliente (negado por padrão).
+    }
+  }
+}
