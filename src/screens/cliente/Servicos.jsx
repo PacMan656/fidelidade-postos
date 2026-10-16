@@ -10,6 +10,7 @@ import { useConfig } from "../../config/ConfigProvider";
 /* ---------- Trava de preço ---------- */
 export function TravaPreco() {
   const { s, lockPrice } = useApp();
+  const [busy, setBusy] = useState(false);
   const { config } = useConfig();
   const fuelPrices = config.fuelPrices;
   const presets = config.priceLock?.presets || [20, 30, 50];
@@ -55,7 +56,7 @@ export function TravaPreco() {
           <div style={{ fontSize: 11, color: c.onInk2 }}>Total a travar<br />{Number(liters) || 0} L × {brl(fuelPrices[fuel])}</div>
           <div className="mono" style={{ fontSize: 24, fontWeight: 700, color: c.yellow }}>{brl(total)}</div>
         </div>
-        <button className="btn grad mt12" onClick={() => lockPrice(fuel, liters)}>Travar {Number(liters) || 0} L · {brl(total)}</button>
+        <button className="btn grad mt12" disabled={busy} onClick={async () => { setBusy(true); await lockPrice(fuel, Number(liters)); setBusy(false); }}>Travar {Number(liters) || 0} L · {brl(total)}</button>
 
         {s.banked.length > 0 && (
           <div className="mt20">
@@ -160,13 +161,19 @@ export function Agendar() {
   const [day, setDay] = useState(0);
   const [hour, setHour] = useState(null);
   const [station, setStation] = useState(stations[0]);
+  const [busy, setBusy] = useState(false);
+  const slots = config.maintenance?.hours?.length ? config.maintenance.hours : hours;
   if (!m) return <Screen title="Agendar"><Empty Icon={Wrench} title="Serviço não encontrado" text="Volte à manutenção." /></Screen>;
 
   const fmt = (d) => d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" }).replace(".", "");
-  const confirm = () => {
-    const label = `${days[day].toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${hour} · ${station}`;
-    scheduleMaint(m.id, label);
-    nav("/manutencao", { replace: true });
+  const confirm = async () => {
+    const d = days[day];
+    const date = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+    const label = `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${hour} · ${station}`;
+    setBusy(true);
+    const ok = await scheduleMaint(m.id, { date, hour, station, label });
+    setBusy(false);
+    if (ok) nav("/manutencao", { replace: true });
   };
 
   return (
@@ -189,19 +196,19 @@ export function Agendar() {
 
         <div className="field-label mt16">Horário</div>
         <div className="grid3">
-          {hours.map((h) => <button key={h} className={`choice mono ${hour === h ? "on" : ""}`} onClick={() => setHour(h)}>{h}</button>)}
+          {slots.map((h) => <button key={h} className={`choice mono ${hour === h ? "on" : ""}`} onClick={() => setHour(h)}>{h}</button>)}
         </div>
 
         {m.bonus && <div className="note mt16"><Zap size={16} style={{ flexShrink: 0 }} /> Serviços agendados pelo app rendem pontos em dobro.</div>}
-        <button className="btn grad mt16" disabled={!hour} onClick={confirm}>{hour ? "Confirmar agendamento" : "Escolha um horário"}</button>
+        <button className="btn grad mt16" disabled={!hour || busy} onClick={confirm}>{hour ? "Confirmar agendamento" : "Escolha um horário"}</button>
       </div>
     </Screen>
   );
 }
 
 /* ---------- Notificações ---------- */
-const notifIcon = { oferta: Zap, alerta: AlertCircle, manutencao: Wrench };
-const notifTarget = { oferta: "/inicio", alerta: "/resgatar", manutencao: "/manutencao" };
+const notifIcon = { oferta: Zap, alerta: AlertCircle, manutencao: Wrench, voucher: Ticket, carteira: Lock, bonus: Receipt };
+const notifTarget = { oferta: "/inicio", alerta: "/extrato", manutencao: "/manutencao", voucher: "/vouchers", carteira: "/carteira", bonus: "/extrato" };
 
 export function Notificacoes() {
   const nav = useNavigate();
@@ -276,8 +283,8 @@ export function Perfil() {
           <span style={{ userSelect: "all" }}>{config.support.phone}</span>
           <span style={{ userSelect: "all" }}>{config.support.email}</span>
         </div>}
-        <button className="btn ghost mt16" onClick={reset}><RotateCcw size={17} /> Restaurar dados de demonstração</button>
-        <button className="btn soft mt12" onClick={() => { logout(); nav("/entrar", { replace: true }); }}><LogOut size={17} /> Sair</button>
+        {reset && <button className="btn ghost mt16" onClick={reset}><RotateCcw size={17} /> Restaurar dados de demonstração</button>}
+        <button className="btn soft mt12" onClick={async () => { await logout(); nav("/entrar", { replace: true }); }}><LogOut size={17} /> Sair</button>
       </div>
     </Screen>
   );
@@ -286,11 +293,13 @@ export function Perfil() {
 export function Veiculo() {
   const nav = useNavigate();
   const { s, updateCar, flash } = useApp();
-  const [f, setF] = useState({ model: s.car.model, plate: s.car.plate, km: String(s.car.km) });
-  const save = () => {
+  const blank = s.car.plate === "—";
+  const [f, setF] = useState({ model: blank ? "" : s.car.model, plate: blank ? "" : s.car.plate, km: s.car.km ? String(s.car.km) : "" });
+  const save = async () => {
     if (!f.model.trim() || !f.plate.trim()) return flash("Preencha modelo e placa", "err");
-    updateCar({ model: f.model.trim(), plate: f.plate.toUpperCase().trim(), km: Number(f.km) || s.car.km });
-    nav(-1);
+    if (!(Number(f.km) >= 0) || f.km === "") return flash("Informe a quilometragem atual", "err");
+    const ok = await updateCar({ model: f.model.trim(), plate: f.plate.toUpperCase().trim(), km: Number(f.km) });
+    if (ok) nav(-1);
   };
   return (
     <Screen title="Meu veículo">

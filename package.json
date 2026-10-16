@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:emulators": "node scripts/prepare-emulator.mjs && npm --prefix functions run build && firebase emulators:exec --only auth,firestore,functions --project demo-fidelidade --ui \"npm --prefix functions run seed -- --demo && vite --mode emulators\"",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node server/index.js",
-    "start": "vite build && node server/index.js"
+    "test": "npm --prefix functions run test:unit && npm run test:emulators",
+    "test:emulators": "node scripts/prepare-emulator.mjs && npm --prefix functions run build && firebase emulators:exec --only auth,firestore,functions --project demo-fidelidade \"npm --prefix functions run test:emulator\"",
+    "deploy": "npm run build && firebase deploy --only hosting,functions,firestore"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "lucide-react": "^0.468.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"

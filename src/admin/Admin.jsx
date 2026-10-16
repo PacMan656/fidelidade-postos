@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom";
 import {
   Palette, Type, ToggleLeft, Zap, Fuel, Award, Gift, Store, Target, QrCode, Users, Phone, Globe, History, Code2,
-  Plus, Trash2, ChevronDown, ChevronUp, ArrowUp, ArrowDown, LogOut, Upload, RotateCcw, ExternalLink, AlertTriangle, Check,
+  Plus, Trash2, ChevronDown, ChevronUp, ArrowUp, ArrowDown, LogOut, Upload, RotateCcw, ExternalLink, AlertTriangle, Check, UserCog,
 } from "lucide-react";
-import { api, isDemo } from "../config/api";
+import { adminApi as api, isDemo } from "../config/api";
 import { ICON_NAMES, iconOf } from "../config/icons";
 import "./admin.css";
 
@@ -123,6 +123,7 @@ const SECTIONS = [
   { id: "campanha", label: "Campanha frentistas", Icon: Users },
   { id: "contato", label: "Postos e atendimento", Icon: Phone },
   { id: "dominios", label: "Domínios", Icon: Globe },
+  { id: "equipe", label: "Equipe", Icon: UserCog },
   { grp: "Avançado" },
   { id: "historico", label: "Histórico de versões", Icon: History },
   { id: "json", label: "JSON completo", Icon: Code2 },
@@ -354,6 +355,8 @@ function Section({ id, d, set, ctx }) {
 
     case "historico": return <HistoryPanel ctx={ctx} />;
 
+    case "equipe": return <StaffPanel ctx={ctx} stations={d.stations || []} />;
+
     case "json": return <JsonPanel d={d} ctx={ctx} />;
     default: return null;
   }
@@ -362,7 +365,7 @@ function Section({ id, d, set, ctx }) {
 function HistoryPanel({ ctx }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
-  useEffect(() => { api.history(ctx.id, ctx.token).then(setRows).catch((e) => setErr(e.message)); }, [ctx.id, ctx.token, ctx.version]);
+  useEffect(() => { api.history(ctx.id).then(setRows).catch((e) => setErr(e.message)); }, [ctx.id, ctx.version]);
   return (<>
     <h2>Histórico de versões</h2><p className="lead">Cada publicação guarda a versão anterior. Restaurar publica uma nova versão com o conteúdo antigo.</p>
     {isDemo() && <div className="adm-alert warn"><AlertTriangle size={16} /> O histórico fica no servidor e não está disponível no modo demonstração.</div>}
@@ -374,9 +377,56 @@ function HistoryPanel({ ctx }) {
           <tbody>{rows.map((r) => (
             <tr key={r.version}>
               <td className="adm-mono">v{r.version}</td>
-              <td>{r.updatedAt ? new Date(r.updatedAt).toLocaleString("pt-BR") : "—"}</td>
+              <td>{fmtDate(r.updatedAt)}</td>
               <td>{r.updatedBy || "—"}</td>
               <td style={{ textAlign: "right" }}><button className="adm-btn sm" onClick={() => ctx.rollback(r.version)}><RotateCcw size={14} /> Restaurar</button></td>
+            </tr>))}</tbody>
+        </table>
+      </div>
+    )}
+  </>);
+}
+
+const fmtDate = (v) => {
+  const d = v?.toDate ? v.toDate() : v?.seconds ? new Date(v.seconds * 1000) : v ? new Date(v) : null;
+  return d && !isNaN(d) ? d.toLocaleString("pt-BR") : "—";
+};
+
+const ROLE_LABEL = { attendant: "Frentista", manager: "Gerente", owner: "Dono" };
+
+/** RN-02/RN-03: papéis por rede, definidos pelo e-mail da conta. */
+function StaffPanel({ ctx, stations }) {
+  const [rows, setRows] = useState(null);
+  const [form, setForm] = useState({ email: "", role: "attendant", station: stations[0] || "" });
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => api.listStaff(ctx.id).then(setRows).catch((e) => ctx.toast(e.message)), [ctx.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load]);
+  const save = async (email, role, station) => {
+    setBusy(true);
+    try { await api.setStaffRole(ctx.id, email, role, station); ctx.toast(role ? "Papel atualizado · vale no próximo login da pessoa" : "Acesso removido"); setForm((f) => ({ ...f, email: "" })); load(); }
+    catch (e) { ctx.toast(e.message); }
+    finally { setBusy(false); }
+  };
+  return (<>
+    <h2>Equipe</h2><p className="lead">Frentistas registram vendas e validam vouchers. Gerentes também editam a configuração. Só o dono promove gerentes. A pessoa precisa ter criado a conta no app antes.</p>
+    {isDemo() && <div className="adm-alert warn" style={{ marginBottom: 12 }}><AlertTriangle size={16} /> A gestão de equipe precisa do Firebase configurado. Abaixo, um exemplo.</div>}
+    <form className="adm-card" onSubmit={(e) => { e.preventDefault(); if (form.email) save(form.email.trim(), form.role, form.station); }}>
+      <h3>Adicionar ou alterar</h3>
+      <div className="adm-grid">
+        <Field label="E-mail da conta"><input id="adm-staff-email" className="adm-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="pessoa@email.com" /></Field>
+        <Field label="Papel"><select id="adm-staff-role" className="adm-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{Object.entries(ROLE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+        <Field label="Posto"><select id="adm-staff-station" className="adm-input" value={form.station} onChange={(e) => setForm({ ...form, station: e.target.value })}>{stations.map((st) => <option key={st}>{st}</option>)}</select></Field>
+      </div>
+      <div><button className="adm-btn primary" type="submit" disabled={busy || !form.email}>Salvar papel</button></div>
+    </form>
+    {rows && (
+      <div className="adm-card" style={{ overflowX: "auto" }}>
+        <table className="adm-table"><thead><tr><th>NOME</th><th>E-MAIL</th><th>PAPEL</th><th>POSTO</th><th>CÓDIGO</th><th /></tr></thead>
+          <tbody>{rows.map((r) => (
+            <tr key={r.id} style={{ opacity: r.active ? 1 : 0.5 }}>
+              <td>{r.name}</td><td>{r.email}</td><td>{r.active ? ROLE_LABEL[r.role] || r.role : "Sem acesso"}</td><td>{r.station || "—"}</td>
+              <td className="adm-mono">{r.code || "—"}</td>
+              <td style={{ textAlign: "right" }}>{r.active && <button className="adm-btn sm danger" disabled={busy} onClick={() => save(r.email, null, null)}>Remover acesso</button>}</td>
             </tr>))}</tbody>
         </table>
       </div>
@@ -431,7 +481,9 @@ function Preview({ draft }) {
 /* ---------- painel ---------- */
 export default function Admin() {
   const nav = useNavigate();
-  const [token, setToken] = useState(() => { try { return sessionStorage.getItem("adm-token") || ""; } catch { return ""; } });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [token] = useState(null);
   const [session, setSession] = useState(null); // { admin, tenants }
   const [loginErr, setLoginErr] = useState(null);
   const [tenantId, setTenantId] = useState(null);
@@ -446,16 +498,23 @@ export default function Admin() {
 
   const toast = (m) => { clearTimeout(toastT.current); setToastMsg(m); toastT.current = setTimeout(() => setToastMsg(null), 2600); };
 
-  const login = async (tk) => {
-    setLoginErr(null);
-    try {
-      const r = await api.listTenants(tk);
-      setSession(r);
-      try { sessionStorage.setItem("adm-token", tk); } catch {}
-      setTenantId((cur) => cur || r.tenants[0]?.id || null);
-    } catch (e) { setLoginErr(e.status === 401 ? "Token inválido. Confira com o administrador da plataforma." : e.message); }
+  const enter = async () => {
+    const r = await api.listTenants();
+    if (!r.tenants.length && !r.admin.all) throw new Error("Esta conta não é gerente de nenhuma rede.");
+    setSession(r);
+    setTenantId((cur) => cur || r.tenants[0]?.id || null);
   };
-  useEffect(() => { if (token) login(token); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const login = async () => {
+    setLoginErr(null);
+    try { await api.login(email.trim(), password); await enter(); }
+    catch (e) {
+      const msg = /invalid-credential|wrong-password|user-not-found/.test(e.code || e.message) ? "E-mail ou senha incorretos." : e.message;
+      setLoginErr(msg);
+      if (!isDemo()) api.logout();
+    }
+  };
+  // sessão já aberta neste navegador
+  useEffect(() => api.currentUser((u) => { if (u && !session) enter().catch(() => {}); }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async (id) => {
     const cfg = await api.getConfig(id);
@@ -478,10 +537,10 @@ export default function Admin() {
     if (errs.length) return toast("Corrija os itens destacados antes de publicar");
     setBusy(true);
     try {
-      const saved = await api.saveConfig(tenantId, draft, token);
+      const saved = await api.saveConfig(tenantId, draft, published.version);
       setPublished(saved); setDraft(clone(saved));
       setSession((s) => ({ ...s, tenants: s.tenants.map((t) => (t.id === saved.id ? { ...t, name: saved.brand.name, version: saved.version, colors: saved.brand.colors } : t)) }));
-      toast(`Versão ${saved.version} publicada · os apps atualizam em até 1 minuto`);
+      toast(`Versão ${saved.version} publicada · ${isDemo() ? "os apps atualizam em até 1 minuto" : "os apps já receberam"}`);
     } catch (e) {
       setErrors(e.details || [e.message]);
       toast(e.status === 409 ? "Conflito de versão" : "Não foi possível publicar");
@@ -489,7 +548,7 @@ export default function Admin() {
   };
 
   const rollback = async (v) => {
-    try { const saved = await api.rollback(tenantId, v, token); setPublished(saved); setDraft(clone(saved)); toast(`Versão ${v} restaurada como v${saved.version}`); }
+    try { const saved = await api.rollback(tenantId, v); setPublished(saved); setDraft(clone(saved)); toast(`Versão ${v} restaurada como v${saved.version}`); }
     catch (e) { toast(e.message); }
   };
 
@@ -500,7 +559,7 @@ export default function Admin() {
     const id = slug(String(fd.get("id") || name));
     if (!name || !id) return toast("Informe o nome da nova rede");
     try {
-      const cfg = await api.createTenant({ id, name, from: String(fd.get("from")) }, token);
+      const cfg = await api.createTenant({ id, name, from: String(fd.get("from")) });
       setSession((s) => ({ ...s, tenants: [...s.tenants, { id: cfg.id, name: cfg.brand.name, version: cfg.version, colors: cfg.brand.colors, domains: [] }] }));
       setCreating(false); setTenantId(cfg.id); setSection("marca");
       toast(`Rede "${name}" criada a partir de um modelo`);
@@ -511,13 +570,14 @@ export default function Admin() {
   if (!session) {
     return (
       <div className="adm"><div className="adm-login">
-        <form onSubmit={(e) => { e.preventDefault(); setToken(token.trim()); login(token.trim()); }}>
+        <form onSubmit={(e) => { e.preventDefault(); login(); }}>
           <div><h2 style={{ margin: 0 }}>Painel da rede</h2><p className="adm-meta" style={{ margin: "4px 0 0" }}>Altere marca, preços, prêmios e recursos do app sem publicar uma nova versão.</p></div>
-          <Field label="Token de acesso"><input id="adm-token" className="adm-input adm-mono" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="cole o token fornecido" autoFocus /></Field>
+          <Field label="E-mail"><input id="adm-email" className="adm-input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={isDemo() ? "qualquer valor no modo demonstração" : "gerente@rede.com.br"} autoFocus /></Field>
+          <Field label="Senha"><input id="adm-password" className="adm-input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
           {loginErr && <div className="adm-alert err">{loginErr}</div>}
           <button className="adm-btn primary" type="submit" style={{ justifyContent: "center" }}>Entrar</button>
           <button className="adm-btn" type="button" onClick={() => nav("/")} style={{ justifyContent: "center" }}>Voltar ao app</button>
-          <small className="adm-meta">Sem servidor disponível, o painel abre em modo demonstração e as alterações ficam salvas só neste navegador.</small>
+          <small className="adm-meta">{isDemo() ? "Firebase não configurado: o painel abre em modo demonstração e as alterações ficam salvas só neste navegador." : "Acesso para gerentes e donos da rede. O papel é definido pelo dono da rede ou pelo administrador da plataforma."}</small>
         </form>
       </div></div>
     );
@@ -535,13 +595,13 @@ export default function Admin() {
           {session.tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         {session.admin.all && <button className="adm-btn" onClick={() => setCreating(true)}><Plus size={15} /> Nova rede</button>}
-        {published && <span className="adm-meta">Publicado: <b className="adm-mono">v{published.version}</b>{published.updatedAt ? ` · ${new Date(published.updatedAt).toLocaleString("pt-BR")}` : ""}{published.updatedBy ? ` · ${published.updatedBy}` : ""}</span>}
+        {published && <span className="adm-meta">Publicado: <b className="adm-mono">v{published.version}</b>{published.updatedAt ? ` · ${fmtDate(published.updatedAt)}` : ""}{published.updatedBy ? ` · ${published.updatedBy}` : ""}</span>}
         {isDemo() && <span className="adm-pill warn">MODO DEMONSTRAÇÃO</span>}
         <span className="spacer" />
         {dirty ? <span className="adm-pill warn">Alterações não publicadas</span> : published && <span className="adm-pill ok">Tudo publicado</span>}
         <button className="adm-btn" disabled={!dirty} onClick={() => { setDraft(clone(published)); setErrors([]); }}><RotateCcw size={15} /> Descartar</button>
         <button className="adm-btn primary" disabled={!dirty || busy} onClick={publish}><Upload size={15} /> {busy ? "Publicando…" : "Publicar"}</button>
-        <button className="adm-btn" onClick={() => { try { sessionStorage.removeItem("adm-token"); } catch {} setSession(null); setToken(""); }} aria-label="Sair"><LogOut size={15} /></button>
+        <button className="adm-btn" onClick={async () => { await api.logout(); setSession(null); setPassword(""); }} aria-label="Sair"><LogOut size={15} /></button>
       </header>
 
       <div className="adm-body">

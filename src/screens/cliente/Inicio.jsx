@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Zap, Clock, Check, QrCode, Wallet, Lock, Wrench, Sparkles, ChevronRight } from "lucide-react";
 import { c } from "../../theme";
@@ -15,10 +15,13 @@ export default function Inicio() {
   const offer = config.offer || {};
   const missions = f.missions === false ? [] : (config.missions || []).filter((m) => m.active !== false);
 
-  const onOffer = () => {
+  const [busy, setBusy] = useState(false);
+  const onOffer = async () => {
     if (s.offerActive) return nav("/qr");
-    activateOffer();
-    flash("Desconto ativado · mostre seu QR no caixa");
+    setBusy(true);
+    const ok = await activateOffer();
+    setBusy(false);
+    if (ok) flash("Desconto ativado · mostre seu QR no caixa");
   };
 
   return (
@@ -42,7 +45,7 @@ export default function Inicio() {
             <div style={{ padding: "16px 16px 18px" }}>
               <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>{offer.value} <span style={{ fontSize: 15, color: c.muted, fontWeight: 600 }}>{offer.unit}</span></div>
               <div className="subtitle" style={{ marginTop: 2 }}>{offer.description}</div>
-              <button className={`btn mt12 ${s.offerActive ? "soft" : "grad"}`} onClick={onOffer}>
+              <button className={`btn mt12 ${s.offerActive ? "soft" : "grad"}`} onClick={onOffer} disabled={busy}>
                 {s.offerActive ? <><Check size={18} /> Desconto ativado · ver QR</> : "Ativar desconto"}
               </button>
             </div>

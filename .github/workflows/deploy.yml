@@ -1,0 +1,63 @@
+name: Deploy
+
+# Publica app, painel, Cloud Functions, regras e índices no Firebase.
+# Configure em Settings → Secrets and variables → Actions:
+#   Variables: FIREBASE_PROJECT_ID, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_DEFAULT_TENANT
+#   Secrets:   FIREBASE_SERVICE_ACCOUNT (JSON da conta de serviço), VITE_FIREBASE_API_KEY,
+#              VITE_FIREBASE_APP_ID, VITE_RECAPTCHA_SITE_KEY
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm ci --prefix functions
+
+      - name: Testes antes de publicar
+        run: npm test
+
+      - name: Build do app
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_DEFAULT_TENANT: ${{ vars.VITE_DEFAULT_TENANT }}
+        run: npm run build
+
+      - name: Publicar no Firebase
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          printf '%s' "$SA_JSON" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx firebase deploy --project "$PROJECT" --only hosting,functions,firestore --non-interactive --force
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"

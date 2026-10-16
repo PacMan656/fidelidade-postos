@@ -1,98 +1,85 @@
-# App de fidelidade para redes de postos (white-label)
+# Fidelidade Postos
 
-Um único build do app atende várias redes. Tudo o que muda de uma rede para outra fica numa
-**configuração remota**, editada no **Painel da rede**. A publicação chega aos apps sem novo build
-e sem atualização na loja.
+Plataforma white-label de fidelidade para redes de postos de combustível. Um único build atende
+várias redes: cada uma tem marca, preços, prêmios, parceiros e regras próprias, alteradas pelo
+Painel da rede sem nova versão do app.
 
-```
- Painel da rede (/#/admin) ──PUT──▶ Servidor de configuração ◀──GET a cada 1 min── App (cliente/frentista)
-                                    server/data/tenants/<rede>.json
-```
+| Parte | O que é |
+|---|---|
+| **App do cliente** | Pontos, níveis, oferta do dia, QR de identificação, carteira (Pix e cartão), pagamento pelo app, trava de preço, resgates e vouchers, clube de parceiros, manutenção |
+| **App da equipe** | Identificar cliente (QR ou CPF), registrar venda com oferta e trava, validar voucher, campanha de incentivo e ranking |
+| **Painel da rede** | Marca, textos, recursos, ofertas, preços, prêmios, parceiros, missões, Pix, campanha, equipe, domínios, histórico de versões |
+| **Backend** | Firebase: Auth, Firestore, Cloud Functions (Node 22), Hosting |
 
-## Rodar
+Documentação:
+- [Regras de negócio](docs/REGRAS_DE_NEGOCIO.md) — 68 regras numeradas (RN-xx), citadas no código e nos testes
+- [Arquitetura](docs/ARQUITETURA.md) — modelo de dados, functions, segurança
+- [Implantação](docs/IMPLANTACAO.md) — passo a passo para colocar no ar no seu projeto Firebase
+
+## Começar
+
+Requisitos: Node 22 e Java 17+ (para os emuladores do Firebase).
 
 ```bash
 npm install
-npm run start        # compila o app e sobe o servidor em http://localhost:8787
-# desenvolvimento: em um terminal `npm run server`, em outro `npm run dev`
+npm --prefix functions install
 ```
 
-- App da Dona Rosa: `http://localhost:8787/?rede=dona-rosa`
-- App da Rede Avenida (mesmo build): `http://localhost:8787/?rede=rede-avenida`
-- Painel: `http://localhost:8787/#/admin`
+**Modo demonstração** (sem Firebase, dados no navegador):
 
-Tokens de exemplo (em `server/data/admins.json`, **troque antes de publicar**):
+```bash
+npm run dev
+```
 
-| Token | Acesso |
-|---|---|
-| `admin-plataforma-troque` | todas as redes + criar redes |
-| `dona-rosa-troque` | só Dona Rosa |
-| `avenida-troque` | só Rede Avenida |
+**Com o Firebase local** (emuladores com dados de exemplo):
 
-Em produção, defina `ADMIN_TOKEN` (acesso total) ou edite `admins.json`.
+```bash
+npm run dev:emulators
+```
 
-## O que cada rede altera pelo painel
+Abre o app em http://localhost:5173 e o console dos emuladores em http://localhost:4000.
+Contas criadas (senha `demo12345`): `cliente@demo.com`, `carlos@demo.com` (frentista),
+`gerente@demo.com`, `dono@demo.com`, `admin@demo.com` (plataforma). O cliente faz o cadastro na
+rede pelo próprio app (CPF e celular). Painel: http://localhost:5173/#/admin
 
-| Seção | Exemplos |
-|---|---|
-| Marca e cores | nome, sigla do selo, paleta (as cores derivadas são calculadas) |
-| Textos | boas-vindas, subtítulos, nome da carteira |
-| Recursos do app | liga/desliga carteira, Pix, trava de preço, manutenção, clube, missões, modo frentista |
-| Oferta do dia | valor, descrição, validade, aviso no QR |
-| Preços e trava | combustíveis e preço por litro, validade e atalhos da trava |
-| Pontos e níveis | pontos por real, multiplicador no app, níveis |
-| Prêmios, parceiros, missões | cadastro completo, ativar/desativar, ordem |
-| Pix | chave, legenda, código copia e cola |
-| Campanha frentistas | metas, bônus por unidade, prêmio, desafios |
-| Postos e atendimento | unidades (usadas no agendamento), telefone, e-mail |
-| Domínios | domínios que abrem o app já com a rede |
-| Histórico | cada publicação guarda a anterior; restaurar em um clique |
+Outra rede no mesmo build: `?rede=rede-avenida` no endereço.
 
-O painel tem pré-visualização ao vivo do rascunho, validação antes de publicar e proteção contra
-duas pessoas publicando ao mesmo tempo (conflito de versão).
+## Testes
 
-## Como o app descobre a rede
-
-1. `?rede=<id>` no endereço (fica salvo no aparelho)
-2. a última rede usada no aparelho
-3. o domínio (`domains` na configuração), via `GET /api/resolve`
-4. a rede padrão (`VITE_DEFAULT_TENANT`, padrão `dona-rosa`)
-
-O app guarda a última configuração recebida e abre com ela mesmo sem internet. Busca de novo a cada
-minuto e sempre que volta ao primeiro plano. O estado do usuário é separado por rede.
-
-## API do servidor
-
-| Método | Rota | Uso |
-|---|---|---|
-| GET | `/api/config/:rede` | configuração pública (app) |
-| GET | `/api/resolve?host=` | rede pelo domínio |
-| GET | `/api/tenants` | redes que o token edita |
-| PUT | `/api/config/:rede` | publica (valida e incrementa a versão) |
-| POST | `/api/tenants` | cria rede copiando outra (só administrador da plataforma) |
-| GET | `/api/config/:rede/history` | versões anteriores |
-| POST | `/api/config/:rede/rollback/:versao` | restaura uma versão |
-
-Sem servidor (por exemplo, numa hospedagem estática), app e painel entram em **modo demonstração**:
-as configurações embutidas servem de base e as edições ficam só no navegador.
+```bash
+npm test                         # tudo
+npm --prefix functions run test:unit   # regras de cálculo (sem emulador)
+npm run test:emulators           # regras de segurança + fluxos completos nos emuladores
+```
 
 ## Estrutura
 
 ```
-server/index.js                 servidor de configuração (Node puro, sem dependências)
-server/data/tenants/*.json      uma configuração por rede
-server/data/admins.json         tokens do painel
-src/config/                     provedor de configuração, API, catálogo de ícones
-src/admin/                      painel da rede (carregado só em /#/admin)
-src/store/                      estado do usuário (por rede)
-src/screens/                    telas do app
+src/                     app do cliente, da equipe e painel (React + Vite)
+  config/                configuração da rede (tempo real) e API do painel
+  store/                 estado: FirebaseStore (produção) e DemoStore (demonstração)
+  services/              Firebase e tokenização de cartão
+  admin/                 painel da rede
+functions/               Cloud Functions (TypeScript)
+  src/domain/            regras de negócio puras (pontos, venda, Pix, CPF…)
+  src/callable/          funções chamadas pelo app (cliente, equipe, gestão)
+  src/http/              webhook de confirmação Pix
+  src/scheduled/         vencimentos diários
+  test/                  unitários, regras de segurança e integração
+  scripts/seed.mjs       carga inicial (redes, administrador, dados de exemplo)
+seed/tenants/            configuração inicial de cada rede
+firestore.rules          regras de segurança
+firestore.indexes.json   índices
+.github/workflows/       CI (testes) e deploy
 ```
 
-## Limites e próximos passos
+## Scripts
 
-- **Mudanças de código** (uma tela nova, uma regra nova) ainda pedem build. Como o app é web/PWA,
-  basta publicar o build no servidor e todos recebem; não há loja. Se o app virar nativo
-  (React Native/Expo), use atualização OTA (EAS Update) para código e mantenha esta configuração para conteúdo.
-- **Para produção:** trocar os arquivos JSON por banco de dados, login individual no painel (em vez de
-  tokens), HTTPS, backup do histórico e, no app, backend real para conta, saldo, pontos, Pix com
-  confirmação automática e gateway de cartão PCI-DSS.
+| Comando | Faz |
+|---|---|
+| `npm run dev` | app em modo demonstração |
+| `npm run dev:emulators` | app + emuladores do Firebase com dados de exemplo |
+| `npm test` | todos os testes |
+| `npm run build` | build de produção em `dist/` |
+| `npm run deploy` | build + deploy (hosting, functions, regras e índices) |
+| `npm --prefix functions run seed` | carga inicial no projeto (ver docs/IMPLANTACAO.md) |

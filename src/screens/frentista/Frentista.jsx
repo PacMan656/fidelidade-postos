@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, UserPlus, Target, Wrench, Fuel, Droplets, Medal, Zap, User, LogOut, RotateCcw, ChevronRight, Info } from "lucide-react";
+import { Trophy, Target, Medal, Zap, User, LogOut, RotateCcw, ChevronRight, Info, ScanLine, Ticket } from "lucide-react";
 import { c, brl } from "../../theme";
 import { Logo } from "../../components/ui";
 import { useApp } from "../../store/AppStore";
@@ -11,20 +11,15 @@ function useCampaign() {
   const { s } = useApp();
   const { config } = useConfig();
   const camp = config.campaign || { items: [], challenges: [] };
-  const fr = s.fr;
+  const fr = s.fr || {};
   const items = camp.items || [];
-  const bonus = items.reduce((a, it) => a + (fr[it.key] || 0) * it.reward, 0);
+  const bonus = (s.campaign?.bonusCents || 0) / 100;
   const metas = [
     ...items.slice(0, 1).map((it) => ({ Icon: iconOf(it.icon), t: it.label, cur: fr[it.key] || 0, goal: it.goal, rule: `+ ${brl(it.reward)} por unidade` })),
-    ...(camp.identGoal ? [{ Icon: Target, t: "Vendas com CPF", cur: camp.identPct || 0, goal: camp.identGoal, pct: true, rule: `bônus ao bater ${camp.identGoal}%` }] : []),
+    ...(camp.identGoal ? [{ Icon: Target, t: "Vendas com CPF", cur: s.campaign?.identPct || 0, goal: camp.identGoal, pct: true, rule: `bônus ao bater ${camp.identGoal}%` }] : []),
     ...items.slice(1).map((it) => ({ Icon: iconOf(it.icon), t: it.label, cur: fr[it.key] || 0, goal: it.goal, rule: `+ ${brl(it.reward)} cada` })),
   ];
-  const board = [
-    { name: "Marina S.", val: 240 },
-    { name: "João P.", val: 150 },
-    { name: "Pedro L.", val: 120 },
-    { name: `Você (${s.staff.name})`, val: bonus, me: true },
-  ].sort((a, b) => b.val - a.val);
+  const board = s.ranking?.length ? s.ranking : [{ name: `Você (${s.staff.name})`, val: bonus, me: true }];
   const prize = camp.prize || 0;
   return { camp, items, bonus, metas, board, prize, prizePct: prize ? Math.min(100, Math.round((bonus / prize) * 100)) : 0 };
 }
@@ -67,7 +62,7 @@ function CampaignMeter() {
 
 export function Painel() {
   const nav = useNavigate();
-  const { s, bumpFr } = useApp();
+  const { s } = useApp();
   const { board, items, camp } = useCampaign();
   const first = items[0];
   const myPos = board.findIndex((b) => b.me) + 1;
@@ -95,13 +90,12 @@ export function Painel() {
         </div>
 
         <div className="px mt20">
-          <div className="section-title">Registrar atendimento</div>
-          <div className="grid2" style={{ gap: 8 }}>
-            {items.map((x) => { const Icon = iconOf(x.icon); return (
-              <button key={x.key} className="btn sm" onClick={() => bumpFr(x.key, `${x.label} · + ${brl(x.reward)}`)} style={{ height: 46 }}><Icon size={16} /> {x.action}</button>
-            ); })}
+          <div className="section-title">Atendimento</div>
+          <div className="grid2" style={{ gap: 10 }}>
+            <button className="btn grad" style={{ height: 64, flexDirection: "column", gap: 2 }} onClick={() => nav("/frentista/atender")}><ScanLine size={20} /> Atender cliente</button>
+            <button className="btn dark" style={{ height: 64, flexDirection: "column", gap: 2 }} onClick={() => nav("/frentista/voucher")}><Ticket size={20} /> Validar voucher</button>
           </div>
-          <div className="note mt12"><Info size={16} style={{ flexShrink: 0 }} /> Demonstração: em produção esses números vêm automaticamente do PDV — o frentista só acompanha.</div>
+          {s.staffCode && <div className="note mt12"><Info size={16} style={{ flexShrink: 0 }} /><span>Seu código de indicação é <b className="mono">{s.staffCode}</b>. Clientes que se cadastrarem com ele contam na sua meta.</span></div>}
         </div>
 
         <div className="px mt20">
@@ -218,8 +212,8 @@ export function FrPerfil() {
               </button>
             ))}
           </div>
-          <button className="btn ghost mt16" onClick={reset}><RotateCcw size={17} /> Restaurar dados de demonstração</button>
-          <button className="btn soft mt12" onClick={() => { logout(); nav("/entrar", { replace: true }); }}><LogOut size={17} /> Sair</button>
+          {reset && <button className="btn ghost mt16" onClick={reset}><RotateCcw size={17} /> Restaurar dados de demonstração</button>}
+          <button className="btn soft mt12" onClick={async () => { await logout(); nav("/entrar", { replace: true }); }}><LogOut size={17} /> Sair</button>
         </div>
       </div>
     </>

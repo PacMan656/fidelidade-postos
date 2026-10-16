@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Coins, Plus, Fuel, CreditCard, AlertCircle, Check, Trash2, Star, Ticket, ChevronRight } from "lucide-react";
 import { c, brl, num } from "../../theme";
-import { HomeHeader, Screen, FakeQR, PixGlyph, seedOf } from "../../components/ui";
+import { HomeHeader, Screen, PixGlyph, RealQR } from "../../components/ui";
 import { useApp } from "../../store/AppStore";
 import { useConfig } from "../../config/ConfigProvider";
 
@@ -113,52 +113,85 @@ export function Cartoes() {
 
 export function AdicionarCredito() {
   const nav = useNavigate();
-  const { s, addCredit, flash } = useApp();
+  const { s, startPix, confirmPixDemo, watchPix, creditCard, flash, mode } = useApp();
   const { config } = useConfig();
   const pix = config.pix || {};
   const pixOn = config.features?.pix !== false && !!pix.key;
   const [amt, setAmt] = useState(100);
   const [method, setMethod] = useState(pixOn ? "pix" : "card");
+  const [charge, setCharge] = useState(null); // cobrança Pix gerada
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
   const main = s.cards[0];
 
-  const copyPix = () => { try { navigator.clipboard?.writeText(pix.payload); } catch (e) {} flash("Código Pix copiado"); };
-  const confirm = () => { if (addCredit(amt, method)) nav("/carteira", { replace: true }); };
+  // RN-35: o saldo só entra quando o banco confirma; a tela acompanha em tempo real
+  useEffect(() => {
+    if (!charge || charge.demo) return undefined;
+    return watchPix(charge.txid, (st) => {
+      setStatus(st);
+      if (st === "paid") { flash(`Pix confirmado · ${brl(charge.amountCents / 100)} na carteira`); nav("/carteira", { replace: true }); }
+    });
+  }, [charge]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const copy = (txt) => {
+    navigator.clipboard?.writeText(txt).then(() => flash("Código Pix copiado"), () => flash("Toque e segure o código para copiar", "err"));
+  };
+  const generate = async () => { setBusy(true); const r = await startPix(amt); setBusy(false); if (r) { setCharge(r); setStatus("pending"); } };
+  const payCard = async () => { setBusy(true); const ok = await creditCard(amt, main.id); setBusy(false); if (ok) nav("/carteira", { replace: true }); };
+  const demoConfirm = async () => { if (await confirmPixDemo(amt)) nav("/carteira", { replace: true }); };
+  const limits = config.wallet ? `Entre ${brl(config.wallet.minCredit)} e ${brl(config.wallet.maxCredit)} por recarga` : null;
 
   return (
     <Screen title="Adicionar crédito">
       <div className="px">
         <div className="subtitle">Saldo atual: <b style={{ color: c.ink }}>{brl(s.prepaid)}</b></div>
 
-        <div className="field-label mt16">Forma de pagamento</div>
-        <div className="grid2" style={{ gap: 8 }}>
-          {pixOn && <button className={`choice ${method === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")}><PixGlyph /> Pix</button>}
-          <button className={`choice ${method === "card" ? "on" : ""}`} onClick={() => setMethod("card")} disabled={!main}><CreditCard size={16} color={c.brandDeep} /> Cartão</button>
-        </div>
+        {!charge && <>
+          <div className="field-label mt16">Forma de pagamento</div>
+          <div className="grid2" style={{ gap: 8 }}>
+            {pixOn && <button className={`choice ${method === "pix" ? "on" : ""}`} onClick={() => setMethod("pix")}><PixGlyph /> Pix</button>}
+            <button className={`choice ${method === "card" ? "on" : ""}`} onClick={() => setMethod("card")} disabled={!main}><CreditCard size={16} color={c.brandDeep} /> Cartão</button>
+          </div>
 
-        <div className="field-label mt16">Valor</div>
-        <div className="grid3">
-          {[50, 100, 200].map((v) => <button key={v} className={`choice ${Number(amt) === v ? "on" : ""}`} onClick={() => setAmt(v)}>{brl(v)}</button>)}
-        </div>
-        <div className="mt12">
-          <label className="field-label" htmlFor="amt">Outro valor</label>
-          <input id="amt" className="field mono" type="number" min="1" value={amt} onChange={(e) => setAmt(e.target.value)} />
-        </div>
+          <div className="field-label mt16">Valor</div>
+          <div className="grid3">
+            {[50, 100, 200].map((v) => <button key={v} className={`choice ${Number(amt) === v ? "on" : ""}`} onClick={() => setAmt(v)}>{brl(v)}</button>)}
+          </div>
+          <div className="mt12">
+            <label className="field-label" htmlFor="amt">Outro valor</label>
+            <input id="amt" className="field mono" type="number" min="1" value={amt} onChange={(e) => setAmt(e.target.value)} />
+            {limits && <div className="subtitle" style={{ fontSize: 11.5, marginTop: 5 }}>{limits}</div>}
+          </div>
+        </>}
 
         {method === "pix" ? (
-          <>
-            <div className="card mt16" style={{ textAlign: "center" }}>
-              <div className="row center" style={{ gap: 6, marginBottom: 10 }}><PixGlyph /><span style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1 }}>PAGUE COM PIX</span></div>
-              <div className="row center"><FakeQR size={160} seed={seedOf(amt)} /></div>
-              <div style={{ fontSize: 12, color: c.muted, marginTop: 10 }}>{pix.keyLabel}</div>
-              <div className="mono" style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{pix.key}</div>
-              <div className="row" style={{ marginTop: 10, padding: "9px 10px", borderRadius: 10, background: c.cream, border: `1px solid ${c.line}`, gap: 8 }}>
-                <span className="mono" style={{ fontSize: 11, color: c.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{pix.payload}</span>
-                <button onClick={copyPix} style={{ padding: "6px 11px", borderRadius: 9, background: c.ink, color: "#fff", fontSize: 12, fontWeight: 800 }}>Copiar</button>
+          !charge ? (
+            <button className="btn grad mt16" onClick={generate} disabled={busy}>{busy ? "Gerando…" : `Gerar Pix de ${brl(amt)}`}</button>
+          ) : (
+            <>
+              <div className="card mt16" style={{ textAlign: "center" }}>
+                <div className="row center" style={{ gap: 6, marginBottom: 10 }}><PixGlyph /><span style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1 }}>PAGUE {brl(charge.amountCents / 100)} COM PIX</span></div>
+                <div className="row center"><RealQR value={charge.brCode} size={190} /></div>
+                <div style={{ fontSize: 12, color: c.muted, marginTop: 10 }}>{pix.keyLabel}</div>
+                <div className="mono" style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{charge.pixKey || pix.key}</div>
+                <div className="row" style={{ marginTop: 10, padding: "9px 10px", borderRadius: 10, background: c.cream, border: `1px solid ${c.line}`, gap: 8 }}>
+                  <span className="mono" style={{ fontSize: 11, color: c.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", userSelect: "all" }}>{charge.brCode}</span>
+                  <button onClick={() => copy(charge.brCode)} style={{ padding: "6px 11px", borderRadius: 9, background: c.ink, color: "#fff", fontSize: 12, fontWeight: 800 }}>Copiar</button>
+                </div>
               </div>
-            </div>
-            <button className="btn mt12" onClick={confirm}>Já fiz o Pix · adicionar {brl(amt)}</button>
-            <div className="subtitle" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center", lineHeight: 1.4 }}>Em produção, a confirmação do Pix entra automática e o crédito cai em segundos.</div>
-          </>
+              {charge.demo ? (
+                <>
+                  <button className="btn mt12" onClick={demoConfirm}>Já fiz o Pix · adicionar {brl(amt)}</button>
+                  <div className="subtitle" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center", lineHeight: 1.4 }}>Modo demonstração: com o Firebase ligado, o crédito entra sozinho quando o banco confirma.</div>
+                </>
+              ) : (
+                <div className="row center mt12" style={{ gap: 8, padding: 12, borderRadius: 12, background: status === "expired" ? "#FBEAEA" : c.amberSoft, fontSize: 13, fontWeight: 700, color: status === "expired" ? c.danger : "#7C6210" }}>
+                  {status === "expired" ? "Este Pix venceu. Gere um novo." : "Aguardando a confirmação do banco…"}
+                </div>
+              )}
+              <button className="btn ghost mt12" onClick={() => { setCharge(null); setStatus(null); }}>Alterar valor</button>
+            </>
+          )
         ) : !main ? (
           <div className="note mt16"><AlertCircle size={16} style={{ flexShrink: 0 }} /> Cadastre um cartão na carteira para adicionar crédito.</div>
         ) : (
@@ -166,9 +199,10 @@ export function AdicionarCredito() {
             <div className="card row mt16" style={{ gap: 10 }}>
               <CreditCard size={18} color={c.brandDeep} /><span style={{ fontSize: 13, fontWeight: 600 }}>{main.brand} •••• {main.last4} · principal</span>
             </div>
-            <button className="btn mt12" onClick={confirm}>Adicionar {brl(amt)}</button>
+            <button className="btn mt12" onClick={payCard} disabled={busy}>{busy ? "Processando…" : `Adicionar ${brl(amt)}`}</button>
           </>
         )}
+        {mode === "firebase" && <div className="subtitle" style={{ fontSize: 11, marginTop: 12, textAlign: "center" }}>O saldo não expira e não pode ser sacado.</div>}
       </div>
     </Screen>
   );
@@ -179,12 +213,13 @@ const maskVal = (v) => v.replace(/\D/g, "").slice(0, 4).replace(/(\d{2})(\d)/, "
 
 export function AdicionarCartao() {
   const nav = useNavigate();
-  const { addCard } = useApp();
+  const { addCard, mode } = useApp();
   const { config } = useConfig();
   const [cf, setCf] = useState({ num: "", name: "", val: "", cvv: "", kind: "Crédito" });
+  const [busy, setBusy] = useState(false);
   const digits = cf.num.replace(/\D/g, "");
 
-  const save = () => { if (addCard(cf)) nav(-1); };
+  const save = async () => { setBusy(true); const ok = await addCard(cf); setBusy(false); if (ok) nav(-1); };
 
   return (
     <Screen title="Adicionar cartão">
@@ -217,8 +252,10 @@ export function AdicionarCartao() {
             {["Crédito", "Débito"].map((k) => <button key={k} className={`choice ${cf.kind === k ? "on" : ""}`} onClick={() => setCf({ ...cf, kind: k })}>{k}</button>)}
           </div>
         </div>
-        <div className="subtitle" style={{ fontSize: 11.5, marginTop: 10, lineHeight: 1.4 }}>Demonstração — o número completo e o CVV não são salvos, apenas os 4 últimos dígitos.</div>
-        <button className="btn mt16" onClick={save} disabled={digits.length < 13}>Salvar cartão</button>
+        <div className="subtitle" style={{ fontSize: 11.5, marginTop: 10, lineHeight: 1.4 }}>
+          {mode === "firebase" ? "Os dados do cartão vão direto para o provedor de pagamento. Guardamos só a bandeira e os 4 últimos dígitos." : "Demonstração: o número completo e o CVV não são salvos, apenas os 4 últimos dígitos."}
+        </div>
+        <button className="btn mt16" onClick={save} disabled={digits.length < 13 || busy}>{busy ? "Salvando…" : "Salvar cartão"}</button>
       </div>
     </Screen>
   );
@@ -232,10 +269,13 @@ export function Pagar() {
   const [amt, setAmt] = useState(150);
   const [method, setMethod] = useState(s.prepaid >= 150 || !s.cards.length ? "prepaid" : "card");
   const main = s.cards[0];
-  const pts = Math.round((Number(amt) || 0) * (config.points?.perReal || 1) * mult);
+  const pts = Math.floor((Number(amt) || 0) * (config.points?.perReal || 1) * mult);
 
-  const submit = () => {
-    const r = pay(amt, method);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    const r = await pay(amt, method, main?.id);
+    setBusy(false);
     if (r) nav("/carteira/comprovante", { replace: true, state: { ...r, method } });
   };
 
@@ -261,7 +301,7 @@ export function Pagar() {
           <span style={{ fontSize: 12.5, color: "#7C6210", fontWeight: 700 }}>Pontos que você ganha</span>
           <span className="mono" style={{ fontSize: 15, fontWeight: 800, color: "#9A7714" }}>+{num(pts)} pts</span>
         </div>
-        <button className="btn grad mt16" onClick={submit}>Pagar {brl(amt)}</button>
+        <button className="btn grad mt16" onClick={submit} disabled={busy}>{busy ? "Processando…" : `Pagar ${brl(amt)}`}</button>
       </div>
     </Screen>
   );

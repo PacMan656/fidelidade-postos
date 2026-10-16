@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Check, AlertCircle, Crown } from "lucide-react";
 import { c, num } from "../theme";
@@ -88,6 +89,20 @@ export function FakeQR({ size = 150, seed = 11 }) {
       {grid.map((row, y) => row.map((v, x) => (v ? <rect key={`${x}-${y}`} x={x * px} y={y * px} width={px} height={px} fill={c.ink} /> : null)))}
     </svg>
   );
+}
+
+/** QR Code de verdade (lido por qualquer leitor). Usado no caixa, no Pix e nos vouchers. */
+export function RealQR({ value, size = 180 }) {
+  const [svg, setSvg] = useState("");
+  useEffect(() => {
+    let alive = true;
+    if (!value) { setSvg(""); return undefined; }
+    QRCode.toString(String(value), { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: c.ink, light: "#ffffff" } })
+      .then((x) => alive && setSvg(x)).catch(() => alive && setSvg(""));
+    return () => { alive = false; };
+  }, [value]);
+  if (!svg) return <div style={{ width: size, height: size, borderRadius: 8, background: c.cream }} aria-label="Gerando QR Code" />;
+  return <div role="img" aria-label="QR Code" style={{ width: size, height: size, lineHeight: 0 }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", `<svg width="${size}" height="${size}" `) }} />;
 }
 
 export const seedOf = (str) => [...String(str)].reduce((a, ch) => a + ch.charCodeAt(0) * 7, 3);

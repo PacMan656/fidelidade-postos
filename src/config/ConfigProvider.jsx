@@ -13,47 +13,50 @@ function initialTenant() {
   try { return localStorage.getItem("tenant-selected") || null; } catch { return null; }
 }
 
-/** Resolve a rede (URL ?rede= → escolha salva → domínio → padrão), carrega a configuração e mantém atualizada. */
+/**
+ * Resolve a rede (URL ?rede= → escolha salva → domínio → padrão), carrega a configuração e mantém atualizada:
+ * com Firebase, em tempo real pelo Firestore; no modo demonstração, pelo armazenamento local.
+ */
 export function ConfigProvider({ children }) {
   const [tenantId, setTenantId] = useState(initialTenant);
   const [config, setConfig] = useState(() => (tenantId && (cache.get(tenantId) || BUNDLED[tenantId])) || null);
   const [error, setError] = useState(null);
 
-  // sem rede escolhida: tenta pelo domínio, senão usa a padrão
   useEffect(() => {
     if (tenantId) return;
     api.resolveHost(window.location.hostname).then((id) => setTenantId(id || DEFAULT_TENANT)).catch(() => setTenantId(DEFAULT_TENANT));
   }, [tenantId]);
 
+  const accept = useCallback((fresh) => {
+    setError(null);
+    // mantém a referência quando nada mudou, para não redesenhar à toa
+    setConfig((cur) => (cur && JSON.stringify(cur) === JSON.stringify(fresh) ? cur : fresh));
+    // Timestamps do Firestore não são serializáveis: guarda uma cópia simples
+    cache.set(fresh.id, JSON.parse(JSON.stringify(fresh)));
+  }, []);
+
+  const onFail = useCallback((e) => { if (e.status === 404) setError(`A rede "${tenantId}" não foi encontrada.`); }, [tenantId]);
+
   const refresh = useCallback(async () => {
     if (!tenantId || PREVIEW) return;
-    try {
-      const fresh = await api.getConfig(tenantId);
-      setError(null);
-      setConfig((cur) => (cur && cur.id === fresh.id && cur.version === fresh.version && cur.updatedAt === fresh.updatedAt ? cur : fresh));
-      cache.set(tenantId, fresh);
-    } catch (e) {
-      if (e.status === 404) setError(`A rede "${tenantId}" não foi encontrada.`);
-      // offline: segue com a configuração em cache
-    }
-  }, [tenantId]);
+    try { accept(await api.getConfig(tenantId)); } catch (e) { onFail(e); }
+  }, [tenantId, accept, onFail]);
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || PREVIEW) return undefined;
     setConfig((cur) => (cur?.id === tenantId ? cur : cache.get(tenantId) || BUNDLED[tenantId] || null));
+    if (!isDemo()) return api.watchConfig(tenantId, accept, onFail); // tempo real
+
     refresh();
     const t = setInterval(refresh, POLL_MS);
-    const onVis = () => document.visibilityState === "visible" && refresh();
-    // modo demonstração: o painel salva no localStorage; o evento storage avisa as outras abas na hora
-    const onStorage = (e) => { if (isDemo() && e.key === api.demoKey(tenantId)) refresh(); };
-    document.addEventListener("visibilitychange", onVis);
+    const onStorage = (e) => { if (e.key === api.demoKey(tenantId)) refresh(); };
     window.addEventListener("storage", onStorage);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("storage", onStorage); };
-  }, [tenantId, refresh]);
+    return () => { clearInterval(t); window.removeEventListener("storage", onStorage); };
+  }, [tenantId, refresh, accept, onFail]);
 
   // pré-visualização do painel: recebe o rascunho ainda não publicado
   useEffect(() => {
-    if (!PREVIEW) return;
+    if (!PREVIEW) return undefined;
     const onMsg = (e) => { if (e.origin === window.location.origin && e.data?.type === "tenant-preview") setConfig(e.data.config); };
     window.addEventListener("message", onMsg);
     window.parent?.postMessage({ type: "tenant-preview-ready" }, window.location.origin);
@@ -66,7 +69,6 @@ export function ConfigProvider({ children }) {
     setTenantId(id);
   }, []);
 
-  // aplica as cores antes de renderizar os filhos
   useMemo(() => { if (config?.brand?.colors) applyBrand(config.brand.colors); }, [config]);
 
   const value = useMemo(() => ({ config, tenantId, switchTenant, refresh }), [config, tenantId, switchTenant, refresh]);

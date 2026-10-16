@@ -4,18 +4,23 @@ import { ConfigProvider, useConfig, PREVIEW } from "./config/ConfigProvider";
 import { AppProvider, useApp } from "./store/AppStore";
 import { Toast } from "./components/ui";
 import { ClienteTabs, FrentistaTabs, RequireFeature } from "./components/Layouts";
-import { Welcome, Login } from "./screens/auth/Auth";
+import { Welcome, Login, Cadastro } from "./screens/auth/Auth";
 import Inicio from "./screens/cliente/Inicio";
 import Carteira, { AdicionarCredito, AdicionarCartao, Cartoes, Pagar, Comprovante } from "./screens/cliente/Carteira";
 import Resgatar, { MeuQR, Extrato, DetalhePremio, Vouchers, Voucher, Clube, DetalheParceiro } from "./screens/cliente/Pontos";
 import { TravaPreco, Manutencao, Agendar, Notificacoes, Perfil, Veiculo } from "./screens/cliente/Servicos";
 import { Painel, Metas, Ranking, FrPerfil } from "./screens/frentista/Frentista";
+import { Atender, ValidarVoucher } from "./screens/frentista/Atendimento";
 
 // o painel só é baixado por quem abre /admin
 const Admin = lazy(() => import("./admin/Admin"));
 
+const Loading = () => <div className="col" style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><span className="subtitle">Carregando…</span></div>;
+
 function RequireRole({ role }) {
   const { s } = useApp();
+  if (s.ready === false) return <Loading />;
+  if (s.needsJoin) return <Navigate to="/cadastro" replace />;
   if (!s.session) return <Navigate to="/" replace />;
   if (s.session.role !== role) return <Navigate to={s.session.role === "cliente" ? "/inicio" : "/frentista"} replace />;
   return <Outlet />;
@@ -23,6 +28,8 @@ function RequireRole({ role }) {
 
 function PublicOnly() {
   const { s } = useApp();
+  if (s.ready === false) return <Loading />;
+  if (s.needsJoin) return <Navigate to="/cadastro" replace />;
   if (s.session) return <Navigate to={s.session.role === "cliente" ? "/inicio" : "/frentista"} replace />;
   return <Outlet />;
 }
@@ -33,11 +40,12 @@ function MobileApp() {
     // estado do usuário separado por rede; a chave de versão redesenha as telas quando a configuração muda
     <AppProvider key={tenantId} preview={PREVIEW}>
       <div className="app">
-        <Routes key={`${config.version}-${config.updatedAt}`}>
+        <Routes key={config.version}>
           <Route element={<PublicOnly />}>
             <Route path="/" element={<Welcome />} />
             <Route path="/entrar" element={<Login />} />
           </Route>
+          <Route path="/cadastro" element={<Cadastro />} />
 
           <Route element={<RequireRole role="cliente" />}>
             <Route element={<ClienteTabs />}>
@@ -76,6 +84,8 @@ function MobileApp() {
               <Route path="/frentista/ranking" element={<Ranking />} />
               <Route path="/frentista/perfil" element={<FrPerfil />} />
             </Route>
+            <Route path="/frentista/atender" element={<Atender />} />
+            <Route path="/frentista/voucher" element={<ValidarVoucher />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

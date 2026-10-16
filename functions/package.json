@@ -3,13 +3,16 @@
   "private": true,
   "type": "module",
   "main": "lib/index.js",
-  "engines": { "node": "22" },
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "vitest run test/unit",
     "test:emulator": "vitest run test/rules test/integration",
-    "test": "npm run test:unit"
+    "test": "npm run test:unit",
+    "seed": "node scripts/seed.mjs"
   },
   "dependencies": {
     "firebase-admin": "14.5.0",
